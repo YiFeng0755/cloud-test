@@ -17,5 +17,3 @@ SVN_PASSWD = 'lly0000QQ'
 
 RETURN_CODE = 0
 
-#a = {'LOCAL_BASE_URL':'/var/stf/testproject2','SVN_PROJECT_URL':'http://svn.oa.com:24399/testcase','SVN_USER_NAME':'LucyLiu','SVN_PASSWD':'lly0000QQ'}
-#print a
