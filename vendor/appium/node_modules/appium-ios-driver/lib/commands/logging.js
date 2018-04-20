@@ -31,7 +31,8 @@ commands.getLog = async function (logType) {
   }
 
   // If logs captured successfully send response with data, else send error
-  let logs = await this.logs[logType].getLogs();
+  let logObject = this.logs[logType];
+  let logs = logObject ? await logObject.getLogs() : null;
   if (logs) {
     return logs;
   } else {
@@ -47,8 +48,9 @@ helpers.startLogCapture = async function (sim) {
   this.logs.crashlog = new IOSCrashLog();
   this.logs.syslog = new IOSLog({
     sim,
-    udid: this.opts.udid
-  , showLogs: this.opts.showIOSLog
+    udid: this.opts.udid,
+    showLogs: this.opts.showIOSLog,
+    realDeviceLogger: this.opts.realDeviceLogger,
   });
   try {
     await this.logs.syslog.startCapture();

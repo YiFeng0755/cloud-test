@@ -1,6 +1,6 @@
 /* globals expect */
 import desired from './desired';
-import setup from '../../setup-base';
+import setup from '../safari-setup';
 import { loadWebView, spinTitle, spinWait } from '../../helpers/webview';
 import B from 'bluebird';
 import { MOCHA_SAFARI_TIMEOUT } from '../../helpers/session';
@@ -11,7 +11,7 @@ describe('safari - webview ', function () {
   this.timeout(MOCHA_SAFARI_TIMEOUT);
 
   describe('basics', () => {
-    const driver = setup(this, desired, {noReset: true}).driver;
+    const driver = setup(this, desired).driver;
 
     describe('context', function () {
       it('getting current context should work initially', async () => {
@@ -226,7 +226,7 @@ describe('safari - webview ', function () {
       });
 
       it('should return the active element', async () => {
-        var testText = 'hi there';
+        let testText = 'hi there';
         let el = await driver.findElement('id', 'i_am_a_textbox');
         await driver.setValue(testText, el);
         let activeEl = await driver.active();
@@ -281,6 +281,22 @@ describe('safari - webview ', function () {
           (await driver.getTitle()).toLowerCase().should.contain("phishing");
         });
       });
+    });
+  });
+
+  describe('enablePerformanceLogging', function () {
+    let specialCaps = Object.assign({enablePerformanceLogging: true}, desired);
+
+    const driver = setup(this, specialCaps).driver;
+    before(async () => await loadWebView(specialCaps, driver));
+
+    it('should be able to get the performance logs', async () => {
+      let logTypes = await driver.getLogTypes();
+      logTypes.should.include('performance');
+
+      let logs = await driver.getLog('performance');
+      logs.should.be.an.instanceof(Array);
+      logs.length.should.be.above(0);
     });
   });
 });

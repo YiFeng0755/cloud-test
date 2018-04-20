@@ -96,12 +96,30 @@ const desiredCapConstraints = {
   customSSLCert: {
     isString: true
   },
+  webkitResponseTimeout: {
+    isNumber: true
+  },
+  enablePerformanceLogging: {
+    isBoolean: true
+  },
+  enableAsyncExecuteFromHttps: {
+    isBoolean: true
+  },
+  realDeviceLogger: {
+    isString: true
+  },
+  fullContextList: {
+    isBoolean: true
+  },
+  ignoreAboutBlankUrl: {
+    isBoolean: true
+  },
 };
 
 function desiredCapValidation (caps) {
   // make sure that the capabilities have one of `app` or `bundleId`
   if ((caps.browserName || '').toLowerCase() !== 'safari' &&
-      !caps.app && ! caps.bundleId) {
+      !caps.app && !caps.bundleId) {
     let msg = 'The desired capabilities must include either an app or a bundleId for iOS';
     logger.errorAndThrow(msg);
   }
@@ -141,6 +159,13 @@ function desiredCapValidation (caps) {
     } else if (!_.isObject(caps.processArguments)) {
       logger.errorAndThrow('processArguments must be a string, object, or a string JSON object');
     }
+  }
+
+  // there is an undocumented legacy cap `loggingPrefs.performance` to enable
+  // performance logging. Translate to `enablePerformanceLogging`
+  if (typeof caps.enablePerformanceLogging !== 'boolean' &&
+      typeof caps.loggingPrefs === 'object' && caps.loggingPrefs.performance) {
+    caps.enablePerformanceLogging = !!caps.loggingPrefs.performance;
   }
 
   // finally, return true since the superclass check passed, as did this

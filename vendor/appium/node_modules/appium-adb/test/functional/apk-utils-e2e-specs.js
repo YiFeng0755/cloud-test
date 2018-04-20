@@ -4,11 +4,14 @@ import ADB from '../..';
 import path from 'path';
 import { rootDir } from '../../lib/helpers.js';
 import { retryInterval } from 'asyncbox';
+import { MOCHA_TIMEOUT } from './setup';
 
 chai.should();
 chai.use(chaiAsPromised);
 
 describe('apk utils', function () {
+  this.timeout(MOCHA_TIMEOUT);
+
   let adb;
   const contactManagerPath = path.resolve(rootDir, 'test',
                                           'fixtures', 'ContactManager.apk');
@@ -18,7 +21,7 @@ describe('apk utils', function () {
     appPackage.should.equal('com.example.android.contactmanager');
     appActivity.should.equal('.ContactManager');
   };
-  this.timeout(60000);
+
   before(async () => {
     adb = await ADB.createADB();
   });
@@ -111,7 +114,31 @@ describe('apk utils', function () {
                           waitActivity: '*.SuperManager'}).should.eventually
                                                           .be.rejectedWith('SuperManager');
     });
+    it('should start activity with comma separated wait packages list', async () => {
+      await adb.install(contactManagerPath);
+      await adb.startApp({pkg: 'com.example.android.contactmanager',
+        waitPkg: 'com.android.settings, com.example.android.contactmanager',
+        activity: 'ContactManager',
+        waitActivity: '.ContactManager'});
+      await assertPackageAndActivity();
+    });
+    it('should throw error for wrong activity when packages provided as comma separated list', async () => {
+      await adb.install(contactManagerPath);
+      await adb.startApp({pkg: 'com.example.android.contactmanager',
+        waitPkg: 'com.android.settings, com.example.somethingelse',
+        activity: 'SuperManager',
+        waitActivity: '*.ContactManager'}).should.eventually
+        .be.rejectedWith('Activity');
+    });
+  });
+  it('should start activity when start activity is an inner class', async () => {
+    await adb.install(contactManagerPath);
+    await adb.startApp({pkg: 'com.android.settings',
+      activity: '.Settings$NotificationAppListActivity'});
 
+    let {appPackage, appActivity} = await adb.getFocusedPackageAndActivity();
+    appPackage.should.equal('com.android.settings');
+    appActivity.should.equal('.Settings$NotificationAppListActivity');
   });
   it('getFocusedPackageAndActivity should be able get package and activity', async () => {
     await adb.install(contactManagerPath);

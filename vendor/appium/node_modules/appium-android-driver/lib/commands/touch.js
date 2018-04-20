@@ -238,7 +238,7 @@ helpers.parseTouch = async function (gestures, multi) {
       let offset = 0.005;
       if (gesture.action === 'wait') {
         options = gesture.options;
-        offset = (parseInt(gesture.options.ms) / 1000);
+        offset = (parseInt(gesture.options.ms, 10) / 1000);
       }
       let touchStateObject = {
         action: gesture.action,
@@ -264,20 +264,22 @@ helpers.parseTouch = async function (gestures, multi) {
       state.options.y += prevPos.y;
     }
     delete state.options.offset;
-    if (!_.isUndefined(state.options.x) && !_.isUndefined(state.options.y))
+    if (!_.isUndefined(state.options.x) && !_.isUndefined(state.options.y)) {
       prevPos = state.options;
+    }
 
     if (multi) {
-      var timeOffset = state.timeOffset;
+      let timeOffset = state.timeOffset;
       time += timeOffset;
       state.time = androidHelpers.truncateDecimals(time, 3);
 
       // multi gestures require 'touch' rather than 'options'
-      if (!_.isUndefined(state.options.x) && !_.isUndefined(state.options.y))
+      if (!_.isUndefined(state.options.x) && !_.isUndefined(state.options.y)) {
         state.touch = {
           x: state.options.x,
           y: state.options.y
         };
+      }
       delete state.options;
     }
     delete state.timeOffset;

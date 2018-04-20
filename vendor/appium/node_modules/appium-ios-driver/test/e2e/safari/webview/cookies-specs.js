@@ -1,5 +1,5 @@
 import desired from './desired';
-import setup from '../../setup-base';
+import setup from '../safari-setup';
 import { loadWebView } from '../../helpers/webview';
 import env from '../../helpers/env';
 import { MOCHA_SAFARI_TIMEOUT } from '../../helpers/session';
@@ -7,7 +7,7 @@ import { MOCHA_SAFARI_TIMEOUT } from '../../helpers/session';
 describe('safari - webview - cookies', function () {
   this.timeout(MOCHA_SAFARI_TIMEOUT);
 
-  const driver = setup(this, desired, {noReset: true}).driver;
+  const driver = setup(this, desired).driver;
 
   describe('within iframe webview', function () {
     it('should be able to get cookies for a page with none', async () => {
@@ -73,7 +73,7 @@ describe('safari - webview - cookies', function () {
     });
 
     it('should be able to delete one cookie', async () => {
-      var newCookie = {
+      let newCookie = {
         name: `newcookie`,
         value: `i'm new here`
       };

@@ -4,6 +4,7 @@ import ADB from '../..';
 import * as teen_process from 'teen_process';
 import { withMocks } from 'appium-test-support';
 import B from 'bluebird';
+import _ from 'lodash';
 
 
 chai.use(chaiAsPromised);
@@ -14,7 +15,7 @@ const avdName = 'AVD_NAME';
 describe('System calls', withMocks({teen_process}, (mocks) => {
   it('getConnectedDevices should get all connected devices', async () => {
     mocks.teen_process.expects("exec")
-      .once().withExactArgs(adb.executable.path, ['devices'])
+      .once().withExactArgs(adb.executable.path, ['-P', 5037, 'devices'])
       .returns({stdout:"List of devices attached \n emulator-5554	device"});
     let devices = await adb.getConnectedDevices();
     devices.should.have.length.above(0);
@@ -26,7 +27,7 @@ describe('System calls', withMocks({teen_process}, (mocks) => {
                       "* daemon started successfully *\n" +
                       "emulator-5554	device";
     mocks.teen_process.expects("exec")
-      .once().withExactArgs(adb.executable.path, ['devices'])
+      .once().withExactArgs(adb.executable.path, ['-P', 5037, 'devices'])
       .returns({stdout:stdoutValue});
 
     let devices = await adb.getConnectedDevices();
@@ -35,15 +36,16 @@ describe('System calls', withMocks({teen_process}, (mocks) => {
   });
   it('getConnectedDevices should fail when adb devices returns unexpected output', async () => {
     mocks.teen_process.expects("exec")
-      .once().withExactArgs(adb.executable.path, ['devices'])
+      .once().withExactArgs(adb.executable.path, ['-P', 5037, 'devices'])
       .returns({stdout:"foobar"});
     await adb.getConnectedDevices().should.eventually.be
                                    .rejectedWith("Unexpected output while trying to get devices");
     mocks.teen_process.verify();
   });
-  it('getDevicesWithRetry should fail when there are no connected devices', async () => {
+  it('getDevicesWithRetry should fail when there are no connected devices', async function () {
+    this.timeout(20000);
     mocks.teen_process.expects("exec")
-      .atLeast(2).withExactArgs(adb.executable.path, ['devices'])
+      .atLeast(2).withExactArgs(adb.executable.path, ['-P', 5037, 'devices'])
       .returns({stdout:"List of devices attached"});
     await adb.getDevicesWithRetry(1000).should.eventually.be
                                        .rejectedWith("Could not find a connected Android device.");
@@ -51,7 +53,7 @@ describe('System calls', withMocks({teen_process}, (mocks) => {
   });
   it('getDevicesWithRetry should fail when adb devices returns unexpected output', async () => {
     mocks.teen_process.expects("exec")
-      .atLeast(2).withExactArgs(adb.executable.path, ['devices'])
+      .atLeast(2).withExactArgs(adb.executable.path, ['-P', 5037, 'devices'])
       .returns({stdout:"foobar"});
     await adb.getDevicesWithRetry(1000).should.eventually.be
                                        .rejectedWith("Could not find a connected Android device.");
@@ -59,7 +61,7 @@ describe('System calls', withMocks({teen_process}, (mocks) => {
   });
   it('getDevicesWithRetry should get all connected devices', async () => {
     mocks.teen_process.expects("exec")
-      .once().withExactArgs(adb.executable.path, ['devices'])
+      .once().withExactArgs(adb.executable.path, ['-P', 5037, 'devices'])
       .returns({stdout:"List of devices attached \n emulator-5554	device"});
     let devices = await adb.getDevicesWithRetry(1000);
     devices.should.have.length.above(0);
@@ -70,7 +72,7 @@ describe('System calls', withMocks({teen_process}, (mocks) => {
       .onCall(0)
       .returns({stdout:"Foobar"});
     mocks.teen_process.expects("exec")
-      .withExactArgs(adb.executable.path, ['devices'])
+      .withExactArgs(adb.executable.path, ['-P', 5037, 'devices'])
       .returns({stdout:"List of devices attached \n emulator-5554	device"});
     let devices = await adb.getDevicesWithRetry(2000);
     devices.should.have.length.above(0);
@@ -107,6 +109,29 @@ describe('System calls', withMocks({teen_process}, (mocks) => {
 }));
 
 describe('System calls',  withMocks({adb, B, teen_process}, (mocks) => {
+  it('should return adb version', async () => {
+    mocks.adb.expects("adbExec")
+      .once()
+      .withExactArgs('version')
+      .returns("Android Debug Bridge version 1.0.39\nRevision 5943271ace17-android");
+    let adbVersion = await adb.getAdbVersion();
+    adbVersion.versionString.should.equal("1.0.39");
+    adbVersion.versionFloat.should.be.within(1.0, 1.0);
+    adbVersion.major.should.equal(1);
+    adbVersion.minor.should.equal(0);
+    adbVersion.patch.should.equal(39);
+    mocks.adb.verify();
+  });
+  it('should cache adb results', async () => {
+    adb.getAdbVersion.cache = new _.memoize.Cache();
+    mocks.adb.expects("adbExec")
+      .once()
+      .withExactArgs('version')
+      .returns("Android Debug Bridge version 1.0.39\nRevision 5943271ace17-android");
+    await adb.getAdbVersion();
+    await adb.getAdbVersion();
+    mocks.adb.verify();
+  });
   it('fileExists should return true for if ls returns', async () => {
     mocks.adb.expects("ls")
       .once().withExactArgs('foo')
@@ -121,6 +146,22 @@ describe('System calls',  withMocks({adb, B, teen_process}, (mocks) => {
     let list = await adb.ls("foo");
     list.should.deep.equal(['bar']);
     mocks.adb.verify();
+  });
+  it('fileSize should return the file size when digit is after permissions', async function () {
+    let remotePath = '/sdcard/test.mp4';
+    mocks.adb.expects('shell')
+      .once().withExactArgs(['ls', '-la', remotePath])
+      .returns(`-rw-rw---- 1 root sdcard_rw 39571 2017-06-23 07:33 ${remotePath}`);
+    let size = await adb.fileSize(remotePath);
+    size.should.eql(39571);
+  });
+  it('fileSize should return the file size when digit is not after permissions', async function () {
+    let remotePath = '/sdcard/test.mp4';
+    mocks.adb.expects('shell')
+      .once().withExactArgs(['ls', '-la', remotePath])
+      .returns(`-rw-rw---- root sdcard_rw 39571 2017-06-23 07:33 ${remotePath}`);
+    let size = await adb.fileSize(remotePath);
+    size.should.eql(39571);
   });
   it('reboot should call stop and start using shell', async () => {
     mocks.adb.expects("shell")
@@ -140,7 +181,8 @@ describe('System calls',  withMocks({adb, B, teen_process}, (mocks) => {
   });
   it('reboot should restart adbd as root if necessary', async () => {
     mocks.teen_process.expects("exec")
-      .once().withExactArgs(adb.executable.path, ['root']);
+      .once().withExactArgs(adb.executable.path, ['root'])
+      .returns(false);
     mocks.adb.expects("shell")
       .twice().withExactArgs(['stop'])
       .onFirstCall()

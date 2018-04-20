@@ -1,13 +1,17 @@
 import { exec } from 'teen_process';
 import path from 'path';
 import log from '../logger.js';
-import { tempDir, system, mkdirp, fs } from 'appium-support';
-import AdmZip from 'adm-zip';
+import { tempDir, system, mkdirp, fs, zip } from 'appium-support';
 import { getJavaForOs, getJavaHome } from '../helpers.js';
 
 let apkSigningMethods = {};
 
-
+/**
+ * (Re)sign the given apk file on the local file system with the default certificate.
+ *
+ * @param {string} apk - The full path to the local apk file.
+ * @throws {Error} If signing fails.
+ */
 apkSigningMethods.signWithDefaultCert = async function (apk) {
   const java = getJavaForOs();
   let signPath = path.resolve(this.helperJarPath, 'sign.jar');
@@ -18,10 +22,16 @@ apkSigningMethods.signWithDefaultCert = async function (apk) {
     }
     await exec(java, ['-jar', signPath, apk, '--override']);
   } catch (e) {
-    log.errorAndThrow(`Could not sign with default ceritficate. Original error ${e.message}`);
+    log.errorAndThrow(`Could not sign with default certificate. Original error ${e.message}`);
   }
 };
 
+/**
+ * (Re)sign the given apk file on the local file system with a custom certificate.
+ *
+ * @param {string} apk - The full path to the local apk file.
+ * @throws {Error} If signing fails.
+ */
 apkSigningMethods.signWithCustomCert = async function (apk) {
   log.debug(`Signing '${apk}' with custom cert`);
   const java = getJavaForOs();
@@ -44,10 +54,18 @@ apkSigningMethods.signWithCustomCert = async function (apk) {
                            '-keystore', this.keystorePath, '-storepass', this.keystorePassword,
                            '-keypass', this.keyPassword, apk, this.keyAlias]);
   } catch (e) {
-    log.errorAndThrow(`Could not sign with custom ceritficate. Original error ${e.message}`);
+    log.errorAndThrow(`Could not sign with custom certificate. Original error ${e.message}`);
   }
 };
 
+/**
+ * (Re)sign the given apk file on the local file system with either
+ * custom or default certificate based on _this.useKeystore_ property value
+ * and Zip-aligns it after signing.
+ *
+ * @param {string} apk - The full path to the local apk file.
+ * @throws {Error} If signing fails.
+ */
 apkSigningMethods.sign = async function (apk) {
   if (this.useKeystore) {
     await this.signWithCustomCert(apk);
@@ -57,6 +75,12 @@ apkSigningMethods.sign = async function (apk) {
   await this.zipAlignApk(apk);
 };
 
+/**
+ * Perform zip-aligning to the given local apk file.
+ *
+ * @param {string} apk - The full path to the local apk file.
+ * @throws {Error} If zip-align fails.
+ */
 apkSigningMethods.zipAlignApk = async function (apk) {
   log.debug(`Zip-aligning '${apk}'`);
   await this.initZipAlign();
@@ -71,7 +95,13 @@ apkSigningMethods.zipAlignApk = async function (apk) {
   }
 };
 
-// returns true when already signed, false otherwise.
+/**
+ * Check if the app is already signed.
+ *
+ * @param {string} apk - The full path to the local apk file.
+ * @param {string} pgk - The name of application package.
+ * @return {boolean} True if given application is already signed.
+ */
 apkSigningMethods.checkApkCert = async function (apk, pkg) {
   const java = getJavaForOs();
   if (!(await fs.exists(apk))) {
@@ -93,6 +123,13 @@ apkSigningMethods.checkApkCert = async function (apk, pkg) {
   }
 };
 
+/**
+ * Check if the app is already signed with a custom certificate.
+ *
+ * @param {string} apk - The full path to the local apk file.
+ * @param {string} pgk - The name of application package.
+ * @return {boolean} True if given application is already signed with a custom certificate.
+ */
 apkSigningMethods.checkCustomApkCert = async function (apk, pkg) {
   log.debug(`Checking custom app cert for ${apk}`);
   let h = "a-fA-F0-9";
@@ -105,6 +142,14 @@ apkSigningMethods.checkCustomApkCert = async function (apk, pkg) {
   return await this.checkApkKeystoreMatch(keytool, md5, keystoreHash, pkg, apk);
 };
 
+/**
+ * Get the MD5 hash of the keystore.
+ *
+ * @param {string} keytool - The name of the keytool utility.
+ * @param {RegExp} md5re - The pattern used to match the result in _keytool_ output.
+ * @return {?string} Keystore MD5 hash or _null_ if the hash cannot be parsed.
+ * @throws {Error} If getting keystore MD5 hash fails.
+ */
 apkSigningMethods.getKeystoreMd5 = async function (keytool, md5re) {
   let keystoreHash;
   log.debug("Printing keystore md5.");
@@ -121,17 +166,28 @@ apkSigningMethods.getKeystoreMd5 = async function (keytool, md5re) {
   }
 };
 
+/**
+ * Check if the MD5 hash of the particular application matches to the given hash.
+ *
+ * @param {string} keytool - The name of the keytool utility.
+ * @param {RegExp} md5re - The pattern used to match the result in _keytool_ output.
+ * @param {string} keystoreHash - The expected hash value.
+ * @param {string} pkg - The name of the installed package.
+ * @param {string} apk - The full path to the existing apk file.
+ * @return {boolean} True if both hashes are equal.
+ * @throws {Error} If getting keystore MD5 hash fails.
+ */
 apkSigningMethods.checkApkKeystoreMatch = async function (keytool, md5re, keystoreHash,
     pkg, apk) {
   let entryHash = null;
-  let zip = new AdmZip(apk);
   let rsa = /^META-INF\/.*\.[rR][sS][aA]$/;
-  let entries = zip.getEntries();
+  let foundKeystoreMatch = false;
 
-  for (let entry of entries) {
-    entry = entry.entryName;
+  //for (let entry of entries) {
+  await zip.readEntries(apk, async ({entry, extractEntryTo}) => {
+    entry = entry.fileName;
     if (!rsa.test(entry)) {
-      continue;
+      return;
     }
     log.debug(`Entry: ${entry}`);
     let entryPath = path.join(this.tmpDir, pkg, 'cert');
@@ -141,7 +197,7 @@ apkSigningMethods.checkApkKeystoreMatch = async function (keytool, md5re, keysto
     // ensure /tmp/pkg/cert/ doesn't exist or extract will fail.
     await fs.rimraf(entryPath);
     // META-INF/CERT.RSA
-    zip.extractEntryTo(entry, entryPath, true); // overwrite = true
+    await extractEntryTo(entryPath);
     log.debug("extracted!");
     // check for match
     log.debug("Printing apk md5.");
@@ -152,11 +208,14 @@ apkSigningMethods.checkApkKeystoreMatch = async function (keytool, md5re, keysto
     log.debug(`keystore MD5: ${keystoreHash}`);
     let matchesKeystore = entryHash && entryHash === keystoreHash;
     log.debug(`Matches keystore? ${matchesKeystore}`);
+
+    // If we have a keystore match, stop iterating
     if (matchesKeystore) {
-      return true;
+      foundKeystoreMatch = true;
+      return false;
     }
-  }
-  return false;
+  });
+  return foundKeystoreMatch;
 };
 
 export default apkSigningMethods;

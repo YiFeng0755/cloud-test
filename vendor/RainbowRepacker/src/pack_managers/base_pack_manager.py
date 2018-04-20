@@ -47,12 +47,14 @@ class PackManager(object):
         log_utils.getLogger().info('taskWorkDir == ' + self.taskWorkDir)
         self.decompileDir = self.taskWorkDir + '/decompile'
         self.tmpApkToolPath = os.path.join(self.taskWorkDir, 'apktooltmp')
+        if not os.path.exists(self.tmpApkToolPath):
+            os.makedirs(self.tmpApkToolPath)
         
     
     def __del__(self):
         if not self.__debug:
             my_utils.delete_file_folder(self.taskWorkDir)
-        
+        log_utils.getLogger().info('finished')
 
     def decompile(self):
         log_utils.getLogger().info('start decompiling...')
@@ -110,8 +112,7 @@ class PackManager(object):
             
             
             #测试桩重打包
-            import env
-            testbundle_apkFile = os.path.join(env.SUPPORT_DIR, self._projectShorName, 'testbundle', 'TestBundle.apk')
+            testbundle_apkFile = os.path.join(env.SUPPORT_DIR, self._projectShorName, ConfigParse.shareInstance().getLuaVersion(), 'testbundle', 'TestBundle.apk')
             #testbundle_apkFile = os.path.join(env.GOD_TOOL_DIR, 'TestBundle_base.apk')   
             if not os.path.exists(testbundle_apkFile):
                 raise PackException(pack_exception.SOURCE_APK_NOT_EXIST, 'testbundle_base apk file %s does not exist' % testbundle_apkFile)
@@ -122,6 +123,10 @@ class PackManager(object):
             
             testbundle_decompileDir = self.taskWorkDir + '/testbundle_decompile'
             testbundle_tmpApkToolPath = os.path.join(self.taskWorkDir, 'testbundle_apktooltmp')
+
+            if not os.path.exists(testbundle_tmpApkToolPath):
+                os.makedirs(testbundle_tmpApkToolPath)
+
             log_utils.getLogger().info('decompiling testbundle apk ... ')
             
             #测试桩反编译 到   工作目录下/testbundle_decompile

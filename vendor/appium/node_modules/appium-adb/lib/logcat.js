@@ -1,5 +1,7 @@
 import { SubProcess } from 'teen_process';
 import { logger } from 'appium-support';
+import B from 'bluebird';
+
 
 const log = logger.getLogger('Logcat');
 
@@ -13,13 +15,26 @@ class Logcat {
   }
 
   startCapture () {
-    return new Promise(async (resolve, reject) => {
-      log.debug("Starting logcat capture");
+    let started = false;
+    return new B(async (_resolve, _reject) => { // eslint-disable-line promise/param-names
+      const resolve = function (...args) {
+        started = true;
+        _resolve(...args);
+      };
+      const reject = function (...args) {
+        started = true;
+        _reject(...args);
+      };
+
+      log.debug('Starting logcat capture');
       this.proc = new SubProcess(this.adb.path, this.adb.defaultArgs.concat(['logcat', '-v', 'threadtime']));
-      await this.proc.start(0);
       this.proc.on('exit', (code, signal) => {
         log.error(`Logcat terminated with code ${code}, signal ${signal}`);
         this.proc = null;
+        if (!started) {
+          log.warn('Logcat not started. Continuing');
+          resolve();
+        }
       });
       this.proc.on('lines-stderr', (lines) => {
         for (let line of lines) {
@@ -37,6 +52,7 @@ class Logcat {
           this.outputHandler(line);
         }
       });
+      await this.proc.start(0);
     });
   }
 

@@ -118,6 +118,12 @@ function logServerPort (address, port) {
   logger.info(logMessage);
 }
 
+function initHeapdump (args) {
+  if (args.heapdumpEnabled) {
+    require('heapdump');
+  }
+}
+
 async function main (args = null) {
   let parser = getParser();
   let throwInsteadOfExit = false;
@@ -138,11 +144,15 @@ async function main (args = null) {
     // otherwise parse from CLI
     args = parser.parseArgs();
   }
+  initHeapdump(args);
   await logsinkInit(args);
   await preflightChecks(parser, args, throwInsteadOfExit);
   await logStartupInfo(parser, args);
+
   let router = getAppiumRouter(args);
+
   let server = await baseServer(router, args.port, args.address);
+
   try {
     // TODO prelaunch if args.launch is set
     // TODO: startAlertSocket(server, appiumServer);
@@ -171,6 +181,8 @@ async function main (args = null) {
   return server;
 }
 
+
+// when a file is run directly from Node, require.main is set to its module
 if (require.main === module) {
   asyncify(main);
 }

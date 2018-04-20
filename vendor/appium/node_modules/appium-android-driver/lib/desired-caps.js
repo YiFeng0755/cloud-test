@@ -40,6 +40,9 @@ let commonCapConstraints = {
   adbPort: {
     isNumber: true
   },
+  remoteAdbHost: {
+    isString: true
+  },
   avd: {
     isString: true
   },
@@ -66,6 +69,9 @@ let commonCapConstraints = {
   },
   keyPassword: {
     isString: true
+  },
+  chromeDriverPort : {
+    isNumber: true
   },
   chromedriverExecutable: {
     isString: true
@@ -109,6 +115,9 @@ let commonCapConstraints = {
   androidScreenshotPath: {
     isString: true
   },
+  androidInstallPath: {
+    isString: true
+  },
   clearSystemFiles: {
     isBoolean: true
   },
@@ -116,6 +125,18 @@ let commonCapConstraints = {
     isBoolean: true
   },
   autoGrantPermissions: {
+    isBoolean: true
+  },
+  networkSpeed: {
+    isString: true
+  },
+  gpsEnabled: {
+    isBoolean: true
+  },
+  isHeadless: {
+    isBoolean: true
+  },
+  showChromedriverLog: {
     isBoolean: true
   },
 };

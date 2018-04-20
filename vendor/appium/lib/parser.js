@@ -22,7 +22,7 @@ const args = [
     help: '(Android-only) reboot emulator after each session and kill it at the end',
     nargs: 0,
   }],
-   
+
   [['--ipa'], {
     required: false,
     defaultValue: null,
@@ -81,6 +81,42 @@ const args = [
     type: 'int',
     example: '4724',
     help: 'Port to use on PC to foward to testbundle on device',
+  }],
+
+  [['--install-setting-apk'], {
+    dest: 'installSettingApk',
+    defaultValue: false,
+    action: 'storeTrue',
+    required: false,
+    help: '(Android-only) If set, install or update setting apk',
+    nargs: 0,
+  }],
+
+  [['--install-unlock-apk'], {
+    dest: 'installUnlockApk',
+    defaultValue: false,
+    action: 'storeTrue',
+    required: false,
+    help: '(Android-only) If set, install or update unlock apk',
+    nargs: 0,
+  }],
+
+  [['--install-unicodeIME-apk'], {
+    dest: 'installUnicodeApk',
+    defaultValue: false,
+    action: 'storeTrue',
+    required: false,
+    help: '(Android-only) If set, install or update unicodeIME',
+    nargs: 0,
+  }],
+
+  [['--logcat-on'], {
+    dest: 'startLogcat',
+    defaultValue: false,
+    action: 'storeTrue',
+    required: false,
+    help: '(Android-only) If set, start logcat on',
+    nargs: 0,
   }],
 
   [['-r', '--backend-retries'], {
@@ -336,7 +372,7 @@ const args = [
 
   [['--suppress-adb-kill-server'], {
     dest: 'suppressKillServer',
-    defaultValue: false,
+    defaultValue: true,
     action: 'storeTrue',
     required: false,
     help: '(Android-only) If set, prevents Appium from killing the adb server instance',
@@ -683,7 +719,7 @@ const deprecatedArgs = [
 
   [['--dont-stop-app-on-reset'], {
     dest: 'dontStopAppOnReset',
-    defaultValue: false,
+    defaultValue: true,
     action: 'storeTrue',
     required: false,
     deprecatedFor: '--default-capabilities',
@@ -738,6 +774,15 @@ const deprecatedArgs = [
     deprecatedFor: '--default-capabilities',
     help: '[DEPRECATED] - (IOS-only) if set, the iOS system log will be written to the console',
     nargs: 0,
+  }],
+
+  [['--enable-heapdump'], {
+    defaultValue: false,
+    dest: 'heapdumpEnabled',
+    action: 'storeTrue',
+    required: false,
+    help: 'Enable collection of NodeJS memory heap dumps. This is useful for memory leaks lookup',
+    nargs: 0
   }]
 ];
 

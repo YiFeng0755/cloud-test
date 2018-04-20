@@ -7,6 +7,7 @@ import { errors } from 'appium-base-driver';
 import { default as webviewHelpers,
          NATIVE_WIN, WEBVIEW_BASE, WEBVIEW_WIN, CHROMIUM_WIN } from '../webview-helpers';
 
+
 let commands = {}, helpers = {}, extensions = {};
 
 
@@ -118,9 +119,9 @@ helpers.startChromedriverProxy = async function (context) {
       if (androidPackage && androidPackage.length > 0) {
         opts.chromeAndroidPackage = androidPackage[1];
       }
-    } 
+    }
     cd = await setupNewChromedriver(opts, this.adb.curDeviceId,
-                                    this.adb.getAdbServerPort());
+                                    this.adb);
     // bind our stop/exit handler, passing in context so we know which
     // one stopped unexpectedly
     cd.on(Chromedriver.EVENT_CHANGED, (msg) => {
@@ -199,7 +200,7 @@ async function setupExistingChromedriver (chromedriver) {
   return chromedriver;
 }
 
-async function setupNewChromedriver (opts, curDeviceId, adbPort) {
+async function setupNewChromedriver (opts, curDeviceId, adb) {
   // if a port wasn't given, pick a random available one
   if (!opts.chromeDriverPort) {
     let getPort = B.promisify(PortFinder.getPort, {context: PortFinder});
@@ -209,12 +210,14 @@ async function setupNewChromedriver (opts, curDeviceId, adbPort) {
   let chromeArgs = {
     port: opts.chromeDriverPort,
     executable: opts.chromedriverExecutable,
-    adbPort
+    adb,
+    verbose: !!opts.showChromedriverLog,
   };
   let chromedriver = new Chromedriver(chromeArgs);
+  let appPackage = (opts.chromeOptions && opts.chromeOptions.androidPackage) || opts.appPackage;
   let caps = {
     chromeOptions: {
-      androidPackage: opts.appPackage
+      androidPackage: appPackage,
     }
   };
   if (opts.chromeUseRunningApp) {
@@ -231,6 +234,9 @@ async function setupNewChromedriver (opts, curDeviceId, adbPort) {
   }
   if (opts.enablePerformanceLogging) {
     caps.loggingPrefs = {performance: 'ALL'};
+  }
+  if (opts.browserName === 'chromium-webview') {
+    caps.chromeOptions.androidActivity = opts.appActivity;
   }
   caps = webviewHelpers.decorateChromeOptions(caps, opts, curDeviceId);
   await chromedriver.start(caps);

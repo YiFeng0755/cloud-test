@@ -4,6 +4,8 @@ module.exports = {
   BotsFacet: require('./bots'),
   ChannelsFacet: require('./channels.js'),
   ChatFacet: require('./chat.js'),
+  ConversationsFacet: require('./conversations.js'),
+  DialogFacet: require('./dialog.js'),
   DndFacet: require('./dnd.js'),
   EmojiFacet: require('./emoji.js'),
   FilesFacet: require('./files.js'),

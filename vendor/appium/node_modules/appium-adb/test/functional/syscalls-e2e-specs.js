@@ -1,15 +1,15 @@
 import chai from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import ADB from '../..';
-import { apiLevel, avdName } from './setup';
+import { apiLevel, avdName, MOCHA_TIMEOUT, MOCHA_LONG_TIMEOUT } from './setup';
 
 
 chai.use(chaiAsPromised);
 
 describe('System calls', function () {
-  let adb;
+  this.timeout(MOCHA_TIMEOUT);
 
-  this.timeout(50000);
+  let adb;
   before(async () => {
     adb = await ADB.createADB();
   });
@@ -41,26 +41,25 @@ describe('System calls', function () {
   });
   // Skipping for now. Will unskip depending on how it behaves on CI
   it.skip('launchAVD should get all connected avds', async function () {
-    this.timeout(240000);
+    this.timeout(MOCHA_LONG_TIMEOUT);
     let proc = await adb.launchAVD(avdName);
     (await adb.getConnectedEmulators()).length.should.be.above(0);
     proc.stop();
   });
   it('waitForDevice should get all connected avds', async function () {
-    this.timeout(60000);
     await adb.waitForDevice(2);
   });
   it('reboot should reboot the device', async function () {
-    this.timeout(60000);
-    await adb.reboot();
+    this.timeout(MOCHA_LONG_TIMEOUT);
+    await adb.reboot(process.env.TRAVIS ? 200 : undefined);
     await adb.ping();
   });
   it('fileExists should detect when files do and do not exist', async function () {
     (await adb.fileExists('/foo/bar/baz.zip')).should.be.false;
-    (await adb.fileExists('/system/etc/system_fonts.xml')).should.be.true;
+    (await adb.fileExists('/system/')).should.be.true;
   });
   it('ls should list files', async function () {
     (await adb.ls('/foo/bar')).should.eql([]);
-    (await adb.ls('/system/etc')).should.contain('system_fonts.xml');
+    (await adb.ls('/system/')).should.contain('etc');
   });
 });

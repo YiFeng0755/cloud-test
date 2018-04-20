@@ -4,14 +4,14 @@ import path from 'path';
 import { exec } from 'teen_process';
 import log from './logger';
 
-const WAD_VER = "0.7-beta";
+const WAD_VER = "0.9-beta";
 const WAD_DL = `https://github.com/Microsoft/WinAppDriver/releases/download/v${WAD_VER}/WindowsApplicationDriver.msi`;
-const WAD_DL_MD5 = "70edd9bc77b090e30cb45d375fa5a8ef";
+const WAD_DL_MD5 = "17b9b4728782f5a58c72f6d3a4b2494f";
 
 let WAD_INSTALL_PATH = process.env["ProgramFiles(x86)"] || process.env.ProgramFiles || "C:\\Program Files";
 WAD_INSTALL_PATH = path.resolve(WAD_INSTALL_PATH, "Windows Application Driver",
                                 "WinAppDriver.exe");
-const WAD_EXE_MD5 = "26b68fe4ac25ca2ba72e52a3cc57d200";
+const WAD_EXE_MD5 = "3136b9c09ea287e897d8cc4278c9b601";
 const WAD_GUID = "DDCD58BF-37CF-4758-A15E-A60E7CF20E41";
 
 async function downloadWAD () {

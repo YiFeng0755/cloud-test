@@ -3,18 +3,33 @@ var Promise = require('bluebird')
 //var adb = adbkit.createClient()
 var promiseutil = require('../lib/util/promiseutil')
 var fs = require('fs')
-var serial='CoolpadY803-9-0x20b9040f'
+var serial='0cf16cf5'
 var pngpath='/mnt/sdcard/Robotium-Screenshots/'
 var cmdmonitor='am monitor '
 var stream = require('stream')
 var amMonitor=null
-
+var screenName = '/mnt/sdcard/minicap_screen/淘汰赛.jpg'
 var adb = adbkit.createClient({
   //  host: options.host
-    host: '127.0.0.1'
+    host: '172.20.101.12'
     , port: '5037'
   })
-var fns=[]
+
+/*adb.readdir(serial, '/mnt/sdcard/minicap_screen/')
+.then(function(files){
+	files.forEach(function(file){console.log(file.name)})
+})*/
+adb.pull(serial, '/mnt/sdcard/minicap_screen/enter_threegame.jpg')
+.then(function(transfer){
+	console.log('---------------------------------')
+	transfer.on('data', function(data){console.log(data)})
+	transfer.on('error', function(err){console.log(err)})
+	transfer.pipe(fs.createWriteStream('/var/stf/test/test.jpg'))
+})
+.catch(function(err){
+	console.log('error:'+err)
+})
+/*var fns=[]
 adb.readdir(serial,pngpath)
 .then(function(files){
 	files.forEach(function(file){
@@ -46,7 +61,7 @@ adb.readdir(serial,pngpath)
 .then(function(){
 console.log(fns)
 })
-
+*/
 
 
 

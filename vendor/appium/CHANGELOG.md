@@ -1,3 +1,230 @@
+CHANGES IN VERSION 1.7.1 (from 1.7.0)
+===================================
+
+Appium 1.7.1 fixes multiple issues with the previous release. 
+
+#### iOS
+* Add ability to change default Simulator preferences
+
+#### iOS - XCUITest
+* Can use xctestrun file to launch WDA
+* Fix bug that was causing startCapture to be called more than once
+* Apply a workaround for setting default device orientation
+* Update offset determination for iPad
+
+#### iOS+Safari
+* Add handler for starting/stopping JS console capture
+
+#### Android
+* Add support to force upgrade settings app
+* Always assumes the file to be pushed by `pushFile` command contains binary data
+* Add ADB option to to force reinstall on upgrade
+
+#### Android - UiAutomator 2
+* Do not proxy getting app strings
+
+
+CHANGES IN VERSION 1.7.0 (from 1.6.5)
+===================================
+
+**Note:** This is a feature release, marking two major changes:
+  * Support iOS 11 through Xcode 9 beta 6
+  * Support multiple simultaneous sessions in Android and iOS (9+)
+
+**Known Issues:**
+  * Android
+    * Webviews on Android O do not work because of a bug in Chromedriver. We
+      are working on a workaround. Chrome sessions still work
+  * iOS
+    * Touch ID enrollment on simulators in Xcode 9 does not work because of an
+      issue with AppleScript
+    * Scaling simulators with Xcode 9 does not work
+    * Simulators in Xcode 9 produce no meaningful device logs
+    * Parallel Safari/Webview sessions are not working due to an Apple bug
+
+#### General
+* Fix handling of sending keys to elements in recent versions of Selenium
+* Allow `app` capability that is a url to have query parameters
+* Begin to allow multiple device support in situations where it is possible
+  (e.g., iOS under Xcode 9)
+* Add `isHeadless` capability to allow running simulator/emulator with no UI
+
+#### iOS
+* Add command to upload media to simulator
+* Fix reliability of touch ID functionality
+* Fix detection of system apps
+* Update atoms used for MobileSafari automation to those of Selenium 3.5.3
+* Add `realDeviceLogger` capability to allow specification of what program to
+  use to capture logs on real device
+* Fix handling of `enablePerformanceLogging` capability in Safari tests
+* Fix offset when Safari on an iPad has multiple tabs
+
+#### iOS - XCUITest
+* Support for latest Beta of iOS 11 (Xcode 9 beta 6)
+* Multiple device support
+* Fix handling of bundle id on simulators
+* Make `nativeWebTap` a setting as well as a desired capability
+* Allow `nativeWebTap` to work on real devices
+* Do not try to uninstall app before installing on real device, which was causing
+  many issues
+* Fix clearing of text fields
+* Change behavior of `useNewWDA`: if `true`, forces uninstall of any existing
+  WebDriverAgent app on device. Set it to `true` if you want to apply different
+  startup options for WebDriverAgent for each session. Real devices require
+  WebDriverAgent client to run for as long as possible without reinstall/restart
+  to avoid issues. The `false` value will try to detect currently running WDA
+  listener executed by previous testing session(s) and reuse it if possible,
+  which is highly recommended for real device testing and to speed up suites of
+  multiple tests in general. A new WDA session will be triggered at the default
+  URL (http://localhost:8100) if WDA is not listening and `webDriverAgentUrl`
+  capability is not set.
+* Allow setting url in native context
+* Fix screenshot functionality
+
+#### Android
+* Add `remoteAdbHost` capability to specify the host on which adb is running, if
+  it is not localhost
+* Add methods to start and stop recording the screen
+* Fix screenshot commands
+* Skip setting of mock location for emulators
+* Add methods for emulator phone capacity: `sendSMS`, `gsmCall`, `gsmSignal`,
+  `gsmVoice`, `powerAC`, `powerCapacity`, and `networkSpeed`
+* Fix cleanup of adb port forwarding during Chrome sessions
+* Fix error where package name would be appended to fully qualified activity
+  name and package finding would then fail
+* Properly handle bootstrap failure on launch
+* Make sure correct logger is used for bootstrap
+
+#### Android - UIAutomator 2
+* Fix handling of `adbPort` capability
+* Fix coverage handling
+* Handle pressing and long pressing key codes
+* Enable `nativeWebScreenshot` capability
+* Fix restoring of IME when `unicodeKeyboard`/`resetKeyboard` capabilities are
+  used
+* Add `disableWindowAnimation` capability to launch instrumentation with no
+  animation
+* Correctly start ChromeDriver session for Chrome session
+* Allow getting `password` attribute from elements
+
+
+
+
+CHANGES IN VERSION 1.7.0-beta (from 1.6.5)
+===================================
+
+**Note:** This is a **_BETA_** release. Please direct any issues to the [Appium
+issue tracker](https://github.com/appium/appium/issues) and provide as much
+information as possible.
+
+This release exists to provide an updatable package in order to get the latest
+work on Appium. To install, first uninstall Appium and then re-install with the
+`beta` tag. To get any changes that have been published to sub-packages, simply
+repeat that process.
+```
+npm uninstall -g appium
+npm install -g appium@beta
+```
+
+If you are running iOS tests with the XCUITest backend (i.e., iOS 10+ tests, and
+some iOS 9.3 tests, if the `automationName` capability is set to `XCUITest`), you
+should also remove the old build artifacts.
+1. Remove derived data: `rm -rf ~/Library/Developer/Xcode/DerivedData/WebDriverAgent-*`
+2. Remove `WebDriverAgentRunner` application from any real device being tested.
+
+#### Android
+* Add beta version of Espresso Driver. To use, set `automationName = espresso`.
+
+
+CHANGES IN VERSION 1.6.6-beta.4 (from 1.6.5)
+===================================
+
+**Note:** This is a **_BETA_** release. Please direct any issues to the [Appium
+issue tracker](https://github.com/appium/appium/issues) and provide as much
+information as possible.
+
+This release exists to provide an updatable package in order to get the latest
+work on Appium. To install, first uninstall Appium and then re-install with the
+`beta` tag. To get any changes that have been published to sub-packages, simply
+repeat that process.
+```
+npm uninstall -g appium
+npm install -g appium@beta
+```
+
+If you are running iOS tests with the XCUITest backend (i.e., iOS 10+ tests, and
+some iOS 9.3 tests, if the `automationName` capability is set to `XCUITest`), you
+should also remove the old build artifacts.
+1. Remove derived data: `rm -rf ~/Library/Developer/Xcode/DerivedData/WebDriverAgent-*`
+2. Remove `WebDriverAgentRunner` application from any real device being tested.
+
+#### Android
+* Add beta version of Espresso Driver. To use, set `automationName = espresso`.
+
+CHANGES IN VERSION 1.6.5 (from 1.6.4)
+===================================
+
+Appium 1.6.5 fixes many issues and continues the trend to make more aspects of
+the automation process configurable.
+
+#### General
+* Add `--enable-heapdump` server flag to turn on NodeJS memory dump collection,
+  to aid in memory management.
+* Better logging of erroneous responses.
+* Full support of W3C specification's handling of capabilities.
+* Fix licensing in all dependencies.
+
+#### Android
+* Fix backgrounding of app.
+* Add `androidInstallPath` capability to specify where on the device apps are installed.
+* Speed up taking screenshots on Android 5.0 and higher devices.
+* Fix handling of activity names that are inner classes.
+* Support latest Android SDK directory structure.
+* Fix issue where granting permissions would fail if there were too many.
+* Fix handling of parent element information when finding elements.
+
+#### Android - UIAutomator 2
+* Fix handling of boolean return values.
+* Add `skipUnlock` capability to skip the device unlock process.
+* Fix issue where setting the network connection would crash.
+
+
+#### iOS
+* Add `enableAsyncExecuteFromHttps` capability to allow simulators to execute
+  asynchronous JavaScript on pages using HTTPS.
+* Allow setting url in native context, for opening deep links.
+* Better memory management when capturing device logs.
+* Add `webkitResponseTimeout` capability to adjust the timeout for responses in
+  Safari real device tests.
+* Add `enablePerformanceLogging` capability (previously Android-only) to turn on
+  performance logging in Safari tests.
+
+#### iOS - XCUITest
+* Fully support `clearSystemFiles` desired capability, deleting the derived data
+  for the `xcodebuild` process.
+* Fix `longPress` duration, to be milliseconds.
+* Add `mobile: selectPickerWheelValue` method to aid in interacting with picker wheels.
+* Add `mobile: alert` method to enable passing of `buttonLabel` option, to handle
+  alerts with non-standard button names.
+* Fix hanging if an app is not installed and only bundle identifier is given in
+  capabilities.
+* Allow `platformVersion` to be a number or a string.
+
+
+
+CHANGES IN VERSION 1.6.5-beta (from 1.6.4)
+===================================
+
+**Note:** This is a **_BETA_** release. Please direct any issues to the [Appium
+issue tracker](https://github.com/appium/appium/issues) and provide as much
+information as possible.
+
+This release exists to provide an updatable package in order to get the latest
+work on Appium. To install, first uninstall Appium (`npm uninstall -g appium`)
+and then re-install with the `beta` tag (`npm install -g appium@beta`). To get
+any changes that have been published to sub-packages, simply repeat that process.
+
+
 CHANGES IN VERSION 1.6.4 (from 1.6.3)
 ===================================
 

@@ -394,6 +394,7 @@ SlackDataStore.prototype.getChannelOrGroupByName = function getChannelOrGroupByN
  * @param {Object} data
  */
 SlackDataStore.prototype.cacheRtmStart = function cacheRtmStart(data) {
+  var self;
   this.clear();
 
   forEach(data.users || [], bind(function cacheRtmUser(user) {
@@ -408,12 +409,24 @@ SlackDataStore.prototype.cacheRtmStart = function cacheRtmStart(data) {
   forEach(data.groups || [], bind(function cacheRtmGroup(group) {
     this.setGroup(new models.Group(group));
   }, this));
+  forEach(data.mpims || [], bind(function cacheRtmMpim(mpim) {
+    // MPIMs are basically groups (they have the same prefix)
+    // NOTE: there is a Model class for MPDM, and it is used in the model helpers `getModelClass`
+    //       so this could be introducing some inconsistencies in behavior.
+    this.setGroup(new models.Group(mpim));
+  }, this));
   forEach(data.bots || [], bind(function cacheRtmBot(bot) {
     // Bots don't have a separate type currently, so treat them as simple objects
     this.setBot(bot);
   }, this));
 
-  this.getUserById(data.self.id).update(data.self);
+  self = this.getUserById(data.self.id);
+  if (self) {
+    self.update(data.self);
+  } else {
+    // If we got here from an rtm.connect, we may not have any users
+    this.setUser(new models.User(data.self));
+  }
   this.setTeam(data.team);
 };
 

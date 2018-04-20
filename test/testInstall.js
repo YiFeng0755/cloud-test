@@ -6,12 +6,13 @@ var dbapi = require('../lib/db/api')
 var Promise = require('bluebird')
 var adbkit = require('adbkit')
 //var apkP = '/tmp/tudou_87.apk'
-var apkP = '/var/stf/vendor/performanc/pmonitor.apk'
+//var apkP = '/var/stf/vendor/performanc/pmonitor.apk'
+var apkP = '/var/stf/vendor/deviceInfoApk/app-release.apk'
 //var hosts = ['172.20.101.11', '172.20.101.130', '172.20.101.12']
-var hosts = ['172.20.101.11', '172.20.101.130']
-//var pkg = 'jp.co.cyberagent.stf'
+var hosts = ['172.20.101.11', '172.20.101.130', '172.20.101.12']
+var pkg = 'com.example.shelleyzhang.qq'
 //var hosts = ['172.20.101.12']
-var pkg = 'com.boyaa.stf.pmonitor'
+//var pkg = 'com.boyaa.stf.pmonitor'
 
 installAPK()
 
@@ -22,7 +23,7 @@ function installAPK() {
         adb = adbkit.createClient({host:host, port:'5037'})
         adb.listDevices()
             .then(function (devices) {
-                
+                console.log('devices length:'+devices.length)
 				return install(adb, devices, apkP,host)
                 
             })
@@ -33,8 +34,19 @@ function installAPK() {
     function install(adb, devices, apkPath, host){
         var device = devices.shift()
         var serial = device.id
+        console.log('host:',host)
+        console.log('Remaining devices:', devices)
         console.log('start install apk serial:', serial)
         return adb.shell(serial, 'pm clear com.example.unlock')
+            .then(function(){
+                return adb.shell(serial, 'input keyevent 224')
+            })
+            .then(function(){
+                return adb.shell(serial, 'wm dismiss-keyguard')
+                    .catch(function(err){
+                         console.log('unknown command dismiss-keyguard. device:'+serial)
+                    })
+            })
             .then(function () {
                 return adb.shell(serial, 'am start -n com.example.unlock/.Unlock')
             })

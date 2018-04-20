@@ -1,10 +1,6 @@
 import logger from './logger';
 import _ from 'lodash';
 
-
-// Date-Utils: Polyfills for the Date object
-require('date-utils');
-
 const MAX_EVENTS = 5000;
 
 class IOSPerformanceLog {
@@ -52,4 +48,6 @@ class IOSPerformanceLog {
   }
 }
 
+
+export { IOSPerformanceLog };
 export default IOSPerformanceLog;

@@ -69,12 +69,11 @@ async function fullResetSimulator (sim) {
 }
 
 async function resetSimulator (sim, opts, keepApp) {
-  if (!sim) return;
+  if (!sim) return; // eslint-disable-line curly
 
   logger.debug('Cleaning sim state.');
   try {
     await clearAppData(sim, opts, keepApp);
-    await sim.clean();
   } catch (err) {
     logger.warn(err);
     logger.warn("Could not reset simulator. Leaving as is.");
@@ -82,7 +81,7 @@ async function resetSimulator (sim, opts, keepApp) {
 }
 
 async function endSimulator (sim) {
-  if (!sim) return;
+  if (!sim) return; // eslint-disable-line curly
 
   logger.debug('Killing the simulator');
   await sim.shutdown();

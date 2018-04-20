@@ -6,8 +6,8 @@ import _ from 'lodash';
 import B from 'bluebird';
 import { fs } from 'appium-support';
 import { getSimulator, installSSLCert, uninstallSSLCert } from 'appium-ios-simulator';
-import { prepareBootstrap, UIAutoClient } from 'appium-uiauto';
-import { Instruments, utils as instrumentsUtils } from 'appium-instruments';
+import { prepareBootstrap, UIAutoClient } from './uiauto/uiauto';
+import { Instruments, instrumentsUtils } from './instruments';
 import { retry, waitForCondition } from 'asyncbox';
 import commands from './commands/index';
 import { desiredCapConstraints, desiredCapValidation } from './desired-caps';
@@ -17,7 +17,6 @@ import { install, needsInstall, SAFARI_LAUNCHER_BUNDLE } from './safari-launcher
 import { setLocale, setPreferences } from './settings';
 import { runSimulatorReset, isolateSimulatorDevice, checkSimulatorAvailable,
          moveBuiltInApp, getAdjustedDeviceName, endSimulator, runRealDeviceReset } from './device';
-import { version } from '../../package.json'; // eslint-disable-line import/no-unresolved
 import { IWDP } from './iwdp';
 
 
@@ -99,8 +98,6 @@ class IosDriver extends BaseDriver {
   constructor (opts, shouldValidateCaps) {
     super(opts, shouldValidateCaps);
 
-    logger.debug(`IosDriver version: ${version}`);
-
     this.desiredCapConstraints = desiredCapConstraints;
     this.resetIos();
   }
@@ -143,7 +140,7 @@ class IosDriver extends BaseDriver {
     this.opts.curOrientation = this.opts.initialOrientation;
 
     this.sock = path.resolve(this.opts.tmpDir || '/tmp', 'instruments_sock');
-    this.perfLogEnabled = !!(typeof this.opts.loggingPrefs === 'object' && this.opts.loggingPrefs.performance);
+
     try {
       await this.configureApp();
     } catch (err) {
@@ -153,6 +150,7 @@ class IosDriver extends BaseDriver {
                    `special app name.`);
       throw err;
     }
+
     await this.start();
 
     // TODO: this should be in BaseDriver.postCreateSession
@@ -180,6 +178,10 @@ class IosDriver extends BaseDriver {
       await uninstallSSLCert(this.caps.customSSLCert, this.sim.udid);
     }
 
+    if (this.opts.enableAsyncExecuteFromHttps && !this.isRealDevice()) {
+      await this.stopHttpsAsyncServer();
+    }
+
     this.uiAutoClient = null;
     this.instruments = null;
     this.realDevice = null;
@@ -188,7 +190,7 @@ class IosDriver extends BaseDriver {
     this.curCoords = null;
     this.opts.curOrientation = null;
     if (!_.isEmpty(this.logs)) {
-      this.logs.syslog.stopCapture();
+      await this.logs.syslog.stopCapture();
       this.logs = {};
     }
 
@@ -321,11 +323,17 @@ class IosDriver extends BaseDriver {
       }
     }
 
+    await runSimulatorReset(this.sim, this.opts, this.keepAppToRetainPrefs);
+
     if (this.caps.customSSLCert && !this.isRealDevice()) {
       await installSSLCert(this.caps.customSSLCert, this.sim.udid);
     }
 
-    await runSimulatorReset(this.sim, this.opts, this.keepAppToRetainPrefs);
+    if (this.opts.enableAsyncExecuteFromHttps && !this.isRealDevice()) {
+      // await this.sim.shutdown();
+      await this.startHttpsAsyncServer();
+    }
+
     await isolateSimulatorDevice(this.sim, this.opts);
     this.localConfig = await setLocale(this.sim, this.opts, this.localConfig, this.isSafari());
     await setPreferences(this.sim, this.opts, this.isSafari());
@@ -437,7 +445,7 @@ class IosDriver extends BaseDriver {
   validateDesiredCaps (caps) {
     // check with the base class, and return if it fails
     let res = super.validateDesiredCaps(caps);
-    if (!res) return res;
+    if (!res) return res; // eslint-disable-line curly
 
     return desiredCapValidation(caps);
   }

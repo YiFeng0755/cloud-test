@@ -7,6 +7,7 @@ var apkP = '/var/stf/vendor/performanc/pmonitor.apk'
 //var host = '172.20.137.14'
 //var host = '172.20.101.130'
 var host = '172.20.101.130'
+//var hosts = ['172.20.101.11', '172.20.101.130', '172.20.101.12']
 //var serial = 'BTF4C17323007988'
 //var serial = '69D4C16B26002353'
 //var serial  = 'MVPVAQQG8TI7MFWS'

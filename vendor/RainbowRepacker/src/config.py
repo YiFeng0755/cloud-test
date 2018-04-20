@@ -46,6 +46,42 @@ class ConfigParse(object):
         self.__outputDir = jsonData['outDir']
         self.__keystore = jsonData['keystore']
         self.__packageName = jsonData['packageName']
+        self.__luaversion = jsonData['luaversion']
+
+        # - 表示只替换同名文件夹或文件
+        # * 表示复制源所有文件/文件夹, 替换到目标文件夹
+        self.__fileMap = {
+            '3.x': {
+                'lib': {
+                    'copyMode': '-',
+                    'targetDir': 'lib'
+                },
+                'scripts': {
+                    'copyMode': '*',
+                    'targetDir': 'assets/scripts'
+                },
+                'smali': {
+                    'copyMode': '*',
+                    'targetDir': 'smali/com/boyaa/autotest'
+                },
+            }, ## 3.x config
+                          
+            '4.0': {
+                'lib': {
+                    'copyMode': '-',
+                    'targetDir': 'lib'
+                },
+                'scripts': {
+                    'copyMode': '*',
+                    'targetDir': 'assets/scripts'
+                },
+                'smali': {
+                    'copyMode': '*',
+                    'targetDir': 'smali/com/boyaa/autotest'
+                },
+            }  ## 4.0 config
+        } ## __fileMap
+
     
     # 用户自定义渠道标识名称
     def getChannelSymbolFileName(self):
@@ -62,6 +98,12 @@ class ConfigParse(object):
     def getOutputName(self):
         #return "autotest_"+self.__apkPath.rsplit("\\", 1)[1]
         return "autotest_" + os.path.basename(self.__apkPath)
+
+    def getLuaVersion(self):
+        return self.__luaversion
+
+    def getFileMap(self):
+        return self.__fileMap
 
     # SDK预处理资源文件目录
     def getConfigDir(self):

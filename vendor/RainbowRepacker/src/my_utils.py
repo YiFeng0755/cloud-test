@@ -149,7 +149,7 @@ def execFormatCmd(cmd):
 
     import shlex
     cmds = shlex.split(cmd)
-    s = subprocess.Popen(cmds)
+    s = subprocess.Popen(cmd, shell=True)
     ret = s.wait()
     if ret:
         # 为什么还要这里??

@@ -3,9 +3,12 @@ import chaiAsPromised from 'chai-as-promised';
 import ADB from '../..';
 import path from 'path';
 import { rootDir } from '../../lib/helpers.js';
-import { apiLevel, platformVersion } from './setup';
+import { apiLevel, platformVersion, MOCHA_TIMEOUT } from './setup';
+import { fs, mkdirp } from 'appium-support';
+import temp from 'temp';
 
 
+chai.should();
 chai.use(chaiAsPromised);
 let expect = chai.expect;
 
@@ -19,8 +22,9 @@ const IME = 'com.example.android.softkeyboard/.SoftKeyboard',
       activity = 'ContactManager';
 
 describe('adb commands', function () {
+  this.timeout(MOCHA_TIMEOUT);
+
   let adb;
-  this.timeout(60000);
   before(async () => {
     adb = await ADB.createADB();
   });
@@ -70,13 +74,15 @@ describe('adb commands', function () {
     (await adb.getPIDsByName(pkg)).length.should.equal(0);
   });
   it('should get device language and country', async function () {
-    if (parseInt(apiLevel, 10) >= 23) return this.skip();
+    if (parseInt(apiLevel, 10) >= 23) return this.skip(); // eslint-disable-line curly
+    if (process.env.TRAVIS) return this.skip(); // eslint-disable-line curly
 
     ['en', 'fr'].should.contain(await adb.getDeviceSysLanguage());
     ['US', 'EN_US', 'EN', 'FR'].should.contain(await adb.getDeviceSysCountry());
   });
   it('should set device language and country', async function () {
-    if (parseInt(apiLevel, 10) >= 23) return this.skip();
+    if (parseInt(apiLevel, 10) >= 23) return this.skip(); // eslint-disable-line curly
+    if (process.env.TRAVIS) return this.skip(); // eslint-disable-line curly
 
     await adb.setDeviceSysLanguage('fr');
     await adb.setDeviceSysCountry('fr');
@@ -88,9 +94,9 @@ describe('adb commands', function () {
     await adb.setDeviceSysCountry('us');
   });
   it('should get device locale', async function () {
-    if (parseInt(apiLevel, 10) < 23) return this.skip();
+    if (parseInt(apiLevel, 10) < 23) return this.skip(); // eslint-disable-line curly
 
-    ['us'].should.contain(await adb.getDeviceLocale());
+    ['us', 'en', 'ca_en'].should.contain(await adb.getDeviceLocale());
   });
   it('should forward the port', async () => {
     await adb.forwardPort(4724, 4724);
@@ -116,6 +122,26 @@ describe('adb commands', function () {
   });
   it('should get screen size', async () => {
     (await adb.getScreenSize()).should.not.be.null;
+  });
+  it('should be able to toggle gps location provider', async () => {
+    await adb.toggleGPSLocationProvider(true);
+    (await adb.getLocationProviders()).should.include('gps');
+    await adb.toggleGPSLocationProvider(false);
+    (await adb.getLocationProviders()).should.not.include('gps');
+  });
+  it('should be able to toogle airplane mode', async () => {
+    await adb.setAirplaneMode(true);
+    (await adb.isAirplaneModeOn()).should.be.true;
+    await adb.setAirplaneMode(false);
+    (await adb.isAirplaneModeOn()).should.be.false;
+  });
+  it('should be able to toogle wifi @skip-ci', async function () {
+    this.retries(3);
+
+    await adb.setWifiState(true);
+    (await adb.isWifiOn()).should.be.true;
+    await adb.setWifiState(false);
+    (await adb.isWifiOn()).should.be.false;
   });
   describe('app permissions', async () => {
     before(async function () {
@@ -145,6 +171,47 @@ describe('adb commands', function () {
     it('should grant permission', async () => {
       await adb.grantPermission('io.appium.android.apis', 'android.permission.RECEIVE_SMS');
       expect(await adb.getGrantedPermissions('io.appium.android.apis')).to.include.members(['android.permission.RECEIVE_SMS']);
+    });
+  });
+
+  describe('push file', function () {
+    function getRandomDir () {
+      return `/data/local/tmp/test${Math.random()}`;
+    }
+
+    let localFile = temp.path({prefix: 'appium', suffix: '.tmp'});
+    let tempFile = temp.path({prefix: 'appium', suffix: '.tmp'});
+    const stringData = `random string data ${Math.random()}`;
+    before(async function () {
+      await mkdirp(path.dirname(localFile));
+      await mkdirp(path.dirname(tempFile));
+
+      await fs.writeFile(localFile, stringData);
+    });
+    after(async function () {
+      if (await fs.exists(localFile)) {
+        await fs.unlink(localFile);
+      }
+    });
+    afterEach(async function () {
+      if (await fs.exists(tempFile)) {
+        await fs.unlink(tempFile);
+      }
+    });
+    it('should push file to a valid location', async function () {
+      let remoteFile = `${getRandomDir()}/remote.txt`;
+
+      await adb.push(localFile, remoteFile);
+
+      // get the file and its contents, to check
+      await adb.pull(remoteFile, tempFile);
+      let remoteData = await fs.readFile(tempFile);
+      remoteData.toString().should.equal(stringData);
+    });
+    it('should throw error if it cannot write to the remote file', async function () {
+      let remoteFile = '/foo/bar/remote.txt';
+
+      await adb.push(localFile, remoteFile).should.be.rejectedWith(/\/foo\/bar\/remote.txt/);
     });
   });
 });

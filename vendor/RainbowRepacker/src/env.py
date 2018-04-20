@@ -20,7 +20,7 @@ GOD_JAVA_DIR 			= GOD_TOOL_DIR + '/jre'
 #工具相关子常量
 TOOL_DEF_BAKSMALI_JARFILE 	= 'baksmali-2.0.jar'
 TOOL_DEF_SMALI_JARFILE 	  	= 'smali-2.0.jar'
-TOOL_DEF_APKTOOL_JARFILE  	= 'apktool_2.0.2.jar'
+TOOL_DEF_APKTOOL_JARFILE  	= 'apktool_2.3.0.jar'#'apktool_2.0.2.jar'
 #java相关子常量
 JAVAC_COMPILE_VERSION           = '1.6'
 

@@ -12,9 +12,14 @@ import { XCUITestDriver } from 'appium-xcuitest-driver';
 import { YouiEngineDriver } from 'appium-youiengine-driver';
 import { WindowsDriver } from 'appium-windows-driver';
 import { MacDriver } from 'appium-mac-driver';
+import { EspressoDriver } from 'appium-espresso-driver';
 import B from 'bluebird';
 import util from 'util';
+import AsyncLock from 'async-lock';
 
+
+const sessionsListGuard = new AsyncLock();
+const pendingDriversGuard = new AsyncLock();
 
 class AppiumDriver extends BaseDriver {
   constructor (args) {
@@ -25,12 +30,27 @@ class AppiumDriver extends BaseDriver {
 
     this.args = args;
 
+    // Access to sessions list must be guarded with a Semaphore, because
+    // it might be changed by other async calls at any time
+    // It is not recommended to access this property directly from the outside
     this.sessions = {};
+
+    // Access to pending drivers list must be guarded with a Semaphore, because
+    // it might be changed by other async calls at any time
+    // It is not recommended to access this property directly from the outside
+    this.pendingDrivers = {};
+  }
+
+  /**
+   * Cancel commands queueing for the umbrella Appium driver
+   */
+  get isCommandsQueueEnabled () {
+    return false;
   }
 
   sessionExists (sessionId) {
-    return _.includes(_.keys(this.sessions), sessionId) &&
-           this.sessions[sessionId].sessionId !== null;
+    const dstSession = this.sessions[sessionId];
+    return dstSession && dstSession.sessionId !== null;
   }
 
   driverForSession (sessionId) {
@@ -58,6 +78,9 @@ class AppiumDriver extends BaseDriver {
       } else if (caps.automationName.toLowerCase() === 'youiengine') {
         // but if we do and it is 'YouiEngine', act on it
         return YouiEngineDriver;
+      } else if (caps.automationName.toLowerCase() === 'espresso') {
+        log.warn('The Appium Espresso driver is currently in early beta and meant only for experimental usage. Its API is not yet complete or guaranteed to work. Please report bugs to the Appium team on GitHub.');
+        return EspressoDriver;
       }
     }
 
@@ -132,11 +155,11 @@ class AppiumDriver extends BaseDriver {
   }
 
   async getSessions () {
-    let sessions = [];
-    for (let [id, driver] of _.toPairs(this.sessions)) {
-      sessions.push({id, capabilities: driver.caps});
-    }
-    return sessions;
+    const sessions = await sessionsListGuard.acquire(AppiumDriver.name, () => this.sessions);
+    return _.toPairs(sessions)
+        .map(([id, driver]) => {
+          return {id, capabilities: driver.caps};
+        });
   }
 
   printNewSessionAnnouncement (driver, caps) {
@@ -154,34 +177,51 @@ class AppiumDriver extends BaseDriver {
 
   async createSession (caps, reqCaps) {
     caps = _.defaults(_.clone(caps), this.args.defaultCapabilities);
+    // InnerDriver is AndroidDriver class
     let InnerDriver = this.getDriverForCaps(caps);
     this.printNewSessionAnnouncement(InnerDriver, caps);
 
-    // sessionOverride server flag check
-    // this will need to be re-thought when we go to multiple session support
-    if (this.args.sessionOverride && !!this.sessions && _.keys(this.sessions).length > 0) {
-      log.info('Session override is on. Deleting other sessions.');
-      for (let id of _.keys(this.sessions)) {
-        log.info(`    Deleting session '${id}'`);
+    // default false
+    if (this.args.sessionOverride) {
+      const sessionIdsToDelete = await sessionsListGuard.acquire(AppiumDriver.name, () => _.keys(this.sessions));
+      if (sessionIdsToDelete.length) {
+        log.info(`Session override is on. Deleting other ${sessionIdsToDelete.length} active session${sessionIdsToDelete.length ? '' : 's'}.`);
         try {
-          await this.deleteSession(id);
-        } catch (ign) {
-          // the error has already been logged in AppiumDriver.deleteSession
-          // continue
-        }
+          await B.map(sessionIdsToDelete, (id) => this.deleteSession(id));
+        } catch (ign) {}
       }
     }
 
-    let curSessions;
+    let runningDriversData, otherPendingDriversData;
+    let d = new InnerDriver(this.args);
     try {
-      curSessions = this.curSessionDataForDriver(InnerDriver);
+      // runningDriversData: []
+      runningDriversData = await this.curSessionDataForDriver(InnerDriver);
+      //log.info("runningDriversData:", runningDriversData)
     } catch (e) {
       throw new errors.SessionNotCreatedError(e.message);
     }
+    await pendingDriversGuard.acquire(AppiumDriver.name, () => {
+      // []
+      this.pendingDrivers[InnerDriver.name] = this.pendingDrivers[InnerDriver.name] || [];
+      otherPendingDriversData = this.pendingDrivers[InnerDriver.name].map((drv) => drv.driverData);
+      this.pendingDrivers[InnerDriver.name].push(d);
+    });
+    // { 'AndroidDirver': AndroidDriver instance }
+    //log.info("pendingDrivers:", this.pendingDrivers)
 
-    let d = new InnerDriver(this.args);
-    let [innerSessionId, dCaps] = await d.createSession(caps, reqCaps, curSessions);
-    this.sessions[innerSessionId] = d;
+    let innerSessionId, dCaps;
+    try {
+      [innerSessionId, dCaps] = await d.createSession(caps, reqCaps, [...runningDriversData, ...otherPendingDriversData]);
+
+      await sessionsListGuard.acquire(AppiumDriver.name, () => {
+        this.sessions[innerSessionId] = d;
+      });
+    } finally {
+      await pendingDriversGuard.acquire(AppiumDriver.name, () => {
+        _.pull(this.pendingDrivers[InnerDriver.name], d);
+      });
+    }
 
     // this is an async function but we don't await it because it handles
     // an out-of-band promise which is fulfilled if the inner driver
@@ -214,14 +254,21 @@ class AppiumDriver extends BaseDriver {
       }
       log.warn(`Closing session, cause was '${e.message}'`);
       log.info(`Removing session ${innerSessionId} from our master session list`);
-      delete this.sessions[innerSessionId];
+      await sessionsListGuard.acquire(AppiumDriver.name, () => {
+        delete this.sessions[innerSessionId];
+      });
     }
   }
 
-  curSessionDataForDriver (InnerDriver) {
-    let data = _.values(this.sessions)
-                .filter((s) => s.constructor.name === InnerDriver.name)
-                .map((s) => s.driverData);
+  async curSessionDataForDriver (InnerDriver) {
+
+    // acquire：确保并发的时候，只有一个可以执行 () => this.sessions函数
+    // sessions: {}
+    const sessions = await sessionsListGuard.acquire(AppiumDriver.name, () => this.sessions);
+    log.info("sessionsDataForDriver:", sessions)
+    const data = _.values(sessions)
+                   .filter((s) => s.constructor.name === InnerDriver.name)
+                   .map((s) => s.driverData);
     for (let datum of data) {
       if (!datum) {
         throw new Error(`Problem getting session data for driver type ` +
@@ -234,45 +281,61 @@ class AppiumDriver extends BaseDriver {
 
   async deleteSession (sessionId) {
     try {
-      if (this.sessions[sessionId]) {
-        await this.sessions[sessionId].deleteSession();
-      }
+      let otherSessionsData = null;
+      let dstSession = null;
+      await sessionsListGuard.acquire(AppiumDriver.name, () => {
+        if (!this.sessions[sessionId]) {
+          return;
+        }
+        const curConstructorName = this.sessions[sessionId].constructor.name;
+        otherSessionsData = _.toPairs(this.sessions)
+              .filter(([key, value]) => value.constructor.name === curConstructorName && key !== sessionId)
+              .map(([, value]) => value.driverData);
+        dstSession = this.sessions[sessionId];
+        log.info(`Removing session ${sessionId} from our master session list`);
+        // regardless of whether the deleteSession completes successfully or not
+        // make the session unavailable, because who knows what state it might
+        // be in otherwise
+        delete this.sessions[sessionId];
+      });
+      await dstSession.deleteSession(sessionId, otherSessionsData);
     } catch (e) {
       log.error(`Had trouble ending session ${sessionId}: ${e.message}`);
       throw e;
-    } finally {
-      // regardless of whether the deleteSession completes successfully or not
-      // make the session unavailable, because who knows what state it might
-      // be in otherwise
-      log.info(`Removing session ${sessionId} from our master session list`);
-      delete this.sessions[sessionId];
     }
   }
 
   async executeCommand (cmd, ...args) {
+    // getStatus command should not be put into queue. If we do it as part of super.executeCommand, it will be added to queue.
+    // There will be lot of status commands in queue during createSession command, as createSession can take up to or more than a minute.
+    if (cmd === 'getStatus') {
+      return await this.getStatus();
+    }
     if (isAppiumDriverCommand(cmd)) {
       return super.executeCommand(cmd, ...args);
     }
 
-    let sessionId = args[args.length - 1];
-    return this.sessions[sessionId].executeCommand(cmd, ...args);
+    const sessionId = _.last(args);
+    const dstSession = await sessionsListGuard.acquire(AppiumDriver.name, () => this.sessions[sessionId]);
+    if (!dstSession) {
+      throw new Error(`The session with id '${sessionId}' does not exist`);
+    }
+    return dstSession.executeCommand(cmd, ...args);
   }
 
   proxyActive (sessionId) {
-    return this.sessions[sessionId] &&
-           _.isFunction(this.sessions[sessionId].proxyActive) &&
-           this.sessions[sessionId].proxyActive(sessionId);
+    const dstSession = this.sessions[sessionId];
+    return dstSession && _.isFunction(dstSession.proxyActive) && dstSession.proxyActive(sessionId);
   }
 
   getProxyAvoidList (sessionId) {
-    if (!this.sessions[sessionId]) {
-      return [];
-    }
-    return this.sessions[sessionId].getProxyAvoidList();
+    const dstSession = this.sessions[sessionId];
+    return dstSession ? dstSession.getProxyAvoidList() : [];
   }
 
   canProxy (sessionId) {
-    return this.sessions[sessionId] && this.sessions[sessionId].canProxy(sessionId);
+    const dstSession = this.sessions[sessionId];
+    return dstSession && dstSession.canProxy(sessionId);
   }
 }
 

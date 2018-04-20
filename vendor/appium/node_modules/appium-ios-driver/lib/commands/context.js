@@ -2,7 +2,7 @@ import _ from 'lodash';
 import B from 'bluebird';
 import { retryInterval } from 'asyncbox';
 import { RemoteDebugger, WebKitRemoteDebugger } from 'appium-remote-debugger';
-import { IOSPerformanceLog } from '../device-log/ios-performance-log';
+import IOSPerformanceLog from '../device-log/ios-performance-log';
 import { errors } from 'appium-base-driver';
 import logger from '../logger';
 import { util } from 'appium-support';
@@ -25,7 +25,19 @@ commands.getCurrentContext = async function () {
 commands.getContexts = async function () {
   logger.debug('Getting list of available contexts');
   let contexts = await this.getContextsAndViews(false);
-  return contexts.map((context) => context.id.toString());
+
+
+  let mapFn = (context) => context.id.toString();
+  if (this.opts.fullContextList) {
+    mapFn = (context) => {
+      return {
+        id: context.id.toString(),
+        title: context.view.title,
+        url: context.view.url,
+      };
+    };
+  }
+  return contexts.map(mapFn);
 };
 
 commands.setContext = async function (name, callback, skipReadyCheck) {
@@ -78,7 +90,7 @@ commands.setContext = async function (name, callback, skipReadyCheck) {
   }
 
   // attempt to start performance logging, if requested
-  if (this.perfLogEnabled && this.remote) {
+  if (this.opts.enablePerformanceLogging && this.remote) {
     logger.debug(`Starting performance log on '${this.curContext}'`);
     this.logs.performance = new IOSPerformanceLog(this.remote);
     this.logs.performance.startCapture();
@@ -148,7 +160,7 @@ extensions.initAutoWebview = async function () {
 extensions.getContextsAndViews = async function (useUrl = true) {
   logger.debug('Retrieving contexts and views');
   let webviews = await this.listWebFrames(useUrl);
-  let ctxs = [{id: NATIVE_WIN}];
+  let ctxs = [{id: NATIVE_WIN, view: {}}];
   this.contexts = [NATIVE_WIN];
   for (let view of webviews) {
     ctxs.push({id: `${WEBVIEW_BASE}${view.id}`, view});
@@ -163,27 +175,28 @@ extensions.listWebFrames = async function (useUrl = true) {
   }
 
   useUrl = useUrl && !!this.getCurrentUrl();
-  /* jshint ignore:start */
   logger.debug(`Selecting by url: ${useUrl} ${useUrl ? `(expected url: '${this.getCurrentUrl()}')` : ''}`);
-  /* jshint ignore:end */
 
   let currentUrl = useUrl ? this.getCurrentUrl() : undefined;
   let pageArray;
   if (this.isRealDevice() && this.remote && this.opts.bundleId) {
     // real device, and already connected
-    pageArray = await this.remote.pageArrayFromJson();
+    pageArray = await this.remote.pageArrayFromJson(this.opts.ignoreAboutBlankUrl);
   } else if (this.remote && this.remote.appIdKey) {
     // simulator, and already connected
-    pageArray = await this.remote.selectApp(currentUrl, this.opts.webviewConnectRetries);
+    pageArray = await this.remote.selectApp(currentUrl, this.opts.webviewConnectRetries, this.opts.ignoreAboutBlankUrl);
   } else if (this.isRealDevice()) {
     // real device, and not connected
     try {
-      this.remote = new WebKitRemoteDebugger({port: this.opts.webkitDebugProxyPort});
-      pageArray = await this.remote.pageArrayFromJson();
+      this.remote = new WebKitRemoteDebugger({
+        port: this.opts.webkitDebugProxyPort,
+        webkitResponseTimeout: this.opts.webkitResponseTimeout,
+      });
+      pageArray = await this.remote.pageArrayFromJson(this.opts.ignoreAboutBlankUrl);
     } catch (err) {
       // it is reasonable to expect that this might be called when there is no
       // webkit remote debugger to connect to
-      if (!_.includes(err.message, 'connect ECONNREFUSED')) throw err;
+      if (!_.includes(err.message, 'connect ECONNREFUSED')) throw err; // eslint-disable-line curly
 
       logger.warn('Attempted to get a list of webview contexts but could not connect to ' +
                   'ios-webkit-debug-proxy. If you expect to find webviews, please ensure ' +
@@ -200,12 +213,13 @@ extensions.listWebFrames = async function (useUrl = true) {
       platformVersion: this.opts.platformVersion
     });
 
+
     let appInfo = await this.remote.connect();
     if (!appInfo) {
       logger.debug('Unable to connect to the remote debugger.');
       return [];
     }
-    pageArray = await this.remote.selectApp(currentUrl, this.opts.webviewConnectRetries);
+    pageArray = await this.remote.selectApp(currentUrl, this.opts.webviewConnectRetries, this.opts.ignoreAboutBlankUrl);
     this.remote.on(RemoteDebugger.EVENT_PAGE_CHANGE, this.onPageChange.bind(this));
 
     let tryClosingAlert = async () => {
@@ -346,7 +360,7 @@ extensions.getLatestWebviewContextForTitle = async function (regExp) {
   let contexts = await this.getContextsAndViews();
   let matchingCtx;
   for (let ctx of contexts) {
-    if (ctx.view && ((ctx.view.title || '').match(regExp) || (ctx.view.url || '').match(regExp))) {
+    if (ctx.view && ((ctx.view.title && ctx.view.title.match(regExp)) || (ctx.view.url && ctx.view.url.match(regExp)))) {
       if (ctx.view.url !== 'about:blank') {
         matchingCtx = ctx;
       } else {
@@ -416,7 +430,7 @@ extensions.typeAndNavToUrl = async function () {
       await this.nativeTap(el.ELEMENT);
     } catch (err) {
       if (_.includes(err.message, 'could not be tapped')) {
-        if (tries++ >= MAX_TRIES) throw err;
+        if (tries++ >= MAX_TRIES) throw err; // eslint-disable-line curly
 
         // generally this means that Safari is in page viewing mode
         // so try to open a new page and then redo the navigation
@@ -434,7 +448,7 @@ extensions.typeAndNavToUrl = async function () {
     } catch (err) {
       // this is flakey on certain systems so we retry until we get something
       // ios sims: safari opens but the text field can't be found
-      if (tries++ >= MAX_TRIES) throw err;
+      if (tries++ >= MAX_TRIES) throw err; // eslint-disable-line curly
       return await navigate();
     }
 
