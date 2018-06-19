@@ -29,10 +29,10 @@ def windowsDebugJson(apkPath=r'E:\TestHoldemSina\apk\sina-release201607311846.ap
         'outDir':outputDir,#外部路径
         'packageName':'com.boyaa.sina',
         'keystore':{#最终反编译二次打包时需要的签名文件,暂时写死使用龙卷风项目组签名文件，后续优化根据需求使用各个项目的签名文件
-            'file':os.path.join(env.GOD_TOOL_DIR, 'debug.keystore'),
-            'storePassword':'android',
-            'keyAlias':'androiddebugkey',
-            'aliasPassword':'android'
+            'file':os.path.join(env.GOD_TOOL_DIR, 'boyaa_region_games_1431420072.keystore'),
+            'storePassword':'boyaagames2014',
+            'keyAlias':'boyaa_region_games.keystore',
+            'aliasPassword':'boyaagames2014'
         },
         'luaversion': luaversion
        }

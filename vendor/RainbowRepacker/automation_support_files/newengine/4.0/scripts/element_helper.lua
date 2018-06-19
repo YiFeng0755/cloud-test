@@ -1,12 +1,3 @@
-sys_set_int('force_redraw', 1);
-EventDispatcher.getInstance():register(Event.Resume, nil, function()
-    forceRenderAnim = new(AnimInt , kAnimNormal, 0, 1 ,500, -1);
-    forceRenderAnim:setEvent(nil, function()
-        sys_set_int('force_redraw', 1);
-        forceRenderAnim = nil;
-    end);
-end)
-
 local UI = require('byui.ui')
 
 local function decode_json(args)
@@ -117,6 +108,44 @@ local function match(node, tag_name, expression)
     return eval_predicate(node, expression)
 end
 
+local function tableview_cell_pair(t)
+    local itor = function(t)
+            local co = coroutine.create(
+                function(t)
+                    local i = 1
+                    for k,v in pairs(t) do
+                        for kk, vv in pairs(v) do
+                            coroutine.yield(i,vv)
+                            i = i +1
+                        end
+                    end
+                end)
+
+            return function()
+                local r,i,v = coroutine.resume(co,t)
+                if r then
+                    return i,v
+                end
+                return nil
+            end
+        end
+
+    return itor(t)
+end
+
+--child or cell in tableview
+local function foreach_sub(w, fn)
+    if not w.visible then return end
+
+    for _ , c in ipairs(w.children) do
+        fn(c)
+    end
+
+    for _ , c in tableview_cell_pair(w.active_cells or {}) do
+        fn(c)
+    end
+end
+
 local function parseNodes(xmlNode, segments, idx, nodes, selection)
     if idx > #segments then return {} end
 
@@ -154,7 +183,8 @@ local function parseNodes(xmlNode, segments, idx, nodes, selection)
     end
 
     local function node_children_lua31()
-        for _ , node in ipairs(xmlNode.children) do
+        -- for _ , node in ipairs(xmlNode.children) do
+        foreach_sub(xmlNode, function(node)
             local found = match(node, segment.tag, segment.expression)
             if found then
                 segment.cur_index = segment.cur_index+1
@@ -182,7 +212,7 @@ local function parseNodes(xmlNode, segments, idx, nodes, selection)
                     end
                 end
             end
-        end
+        end)
     end
 
     node_children_lua31()
@@ -305,6 +335,10 @@ local function get_hierarchy_scale(o)
 end
 
 local function dump_widget_info(o, dump_children, xpath , scale)
+    if not o.visible then
+        return nil
+    end
+
     scale = scale or get_hierarchy_scale(o)
 
     local self_scale = {x = scale.x * o.scale.x,
@@ -334,11 +368,15 @@ local function dump_widget_info(o, dump_children, xpath , scale)
         r.type = 'Slider'
     elseif typeof(o, UI.InputView) then
         r.type = 'InputView'
+    elseif typeof(o, UI.TableView) then
+        -- assert(false,"got tableview")
+        r.type = 'TabelView'
     end
-    if dump_children and #o.children > 0 then
+
+    local function dump_to(target, source, itor_func)
         local c_name_index = {}
-        r.children = {}
-        for i, c in ipairs(o.children) do
+
+        for i, c in itor_func(source) do
             local c_xpath
             if xpath then
                 local n_name = c.name
@@ -353,19 +391,34 @@ local function dump_widget_info(o, dump_children, xpath , scale)
 
                 c_xpath = xpath .. '/' .. n_name
             end
-            r.children[i] = dump_widget_info(c, dump_children, c_xpath,self_scale)
-            r.children[i].index = c_name_index[n_name]
+            target[i] = dump_widget_info(c, dump_children, c_xpath,self_scale)
+            if target[i] then
+                target[i].index = c_name_index[n_name]
+            end
         end
     end
+
+    if r.type == 'TabelView' then
+        r.cells = {}
+        dump_to(r.cells, o.active_cells, tableview_cell_pair)
+    end
+
+    if dump_children and #o.children > 0 then
+        r.children = {}
+        dump_to(r.children, o.children, ipairs)
+    end
+
     return r
 end
 
 function getHierarchy(args)
     dict_set_string('Elements', 'getHierarchy', '')
     local root = UI.root
-    local result = cjson.encode(dump_widget_info(root, true, '/'))
+    local result = cjson.encode(dump_widget_info(root, true, '/') or {})
 
     dict_set_string('Elements', 'getHierarchy', result)
+
+    return result
 end
 
 function getNodesByXPath(args)
@@ -387,20 +440,21 @@ function getNodesByXPath(args)
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
 local function get_element_by_name(w, name, elements)
     w = w or UI.root
 
     if name == nil then return end
     if not w.visible then return end
 
-    --
-    for _ , c in ipairs(w.children) do
+    foreach_sub(w, function(c)
         if c.visible and c.name == name then
             table.insert(elements, c)
         end
 
         get_element_by_name(c, name, elements)
-    end
+    end)
 end
 
 local function get_element_by_text(w, text, elements)
@@ -409,8 +463,8 @@ local function get_element_by_text(w, text, elements)
     w = w or UI.root
     if not w.visible then return end
 
-    --
-    for _ , c in ipairs(w.children) do
+
+    foreach_sub(w, function(c)
         if c.___type == 'class<Label>' then
             local data = c:get_data()
             for index , v in pairs(data) do
@@ -421,7 +475,7 @@ local function get_element_by_text(w, text, elements)
         end
 
         get_element_by_text(c, text, elements)
-    end
+    end)
 end
 
 function getElements(args)
