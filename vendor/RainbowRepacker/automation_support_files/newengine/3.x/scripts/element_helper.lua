@@ -1,3 +1,15 @@
+print_string("performace | start to set force_redraw")
+sys_set_int('force_redraw', 1);
+EventDispatcher.getInstance():register(Event.Resume, nil, function()
+    print_string("performace | receive resumeEvent")
+    forceRenderAnim = new(AnimInt , kAnimNormal, 0, 1 ,500, -1);
+    forceRenderAnim:setEvent(nil, function()
+        print_string("performace | set force_redraw by resume")
+        sys_set_int('force_redraw', 1);
+        forceRenderAnim = nil;
+    end);
+end)
+
 local inspect = require('inspect')
 local function decode_json(args)
     local ret_args = nil

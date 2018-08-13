@@ -162,6 +162,41 @@ def execFormatCmd(cmd):
     log_utils.getLogger().debug(cmd)
     return ret
 
+def execFormatCmd_withOut(cmd):
+    cmd = cmd.replace('\\', '/')
+    cmd = re.sub('/+', '/', cmd)
+    if platform.system() == 'Windows':
+        st = subprocess.STARTUPINFO
+        st.dwFlags = subprocess.STARTF_USESHOWWINDOW
+        st.wShowWindow = subprocess.SW_HIDE
+    else:
+        cmd = cmd.encode('utf-8').decode('iso-8859-1')
+
+    # findret = cmd.find('jarsigner')
+    # if findret > -1:
+    #     import shlex
+    #     cmds = shlex.split(cmd)
+    #     log_utils.getLogger().debug('the execformatCmd cmds:'+str(cmds))
+    #     s = subprocess.Popen(cmds)
+    # else:
+    #     s = subprocess.Popen(cmd, shell=True)
+
+    import shlex
+    cmds = shlex.split(cmd)
+    s = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    out, outerr = s.communicate()
+    ret = s.wait()
+    if ret:
+        # 为什么还要这里??
+        s = subprocess.Popen(str(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        stdoutput, erroutput = s.communicate()
+        reportError(str(cmd), stdoutput, erroutput)
+        cmd = 'ERROR:' + str(cmd) + ' ===>>> exec Fail <<<=== '
+    else:
+        cmd += ' ===>>> exec success <<<=== '
+    log_utils.getLogger().debug(cmd)
+    return ret, out
+
 def printf(s):
     log_utils.getLogger().debug(s)
 

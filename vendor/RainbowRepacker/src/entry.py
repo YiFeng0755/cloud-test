@@ -16,7 +16,7 @@ def php_entry(arg):
     from pack_managers.newengine_pack_manager import NewEnginePackManager
     NewEnginePackManager().run()
 
-def windowsDebugJson(apkPath=r'E:\TestHoldemSina\apk\sina-release201607311846.apk', targetDir=None, luaversion='4.0'):
+def windowsDebugJson(apkPath=r'E:\TestHoldemSina\apk\sina-release201607311846.apk', targetDir=None, luaversion='3.x'):
     #rsplit()对字符串进行切片，如果参数num 有指定值，则仅分隔 num 个子字符串
     # outputDir = apkPath.rsplit('\\',1)[0]
     if targetDir != None:
@@ -43,7 +43,7 @@ if __name__ == '__main__' :
     targetDir = None
     luaversion = '4.0'
     if len(sys.argv) == 1:
-        apkPath = r'/var/stf/vendor/test/yxbzV2.2.apk'
+        apkPath = r'C:\Users\LukeJiang\Desktop\kk\engine_android(1)(1).apk'
     else:
         apkPath = sys.argv[1]
         if len(sys.argv) == 3:

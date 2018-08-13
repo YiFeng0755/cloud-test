@@ -1,10 +1,11 @@
 var node_ssh = require('node-ssh')
 
 var ssh = new node_ssh()
-ssh.connect({username:'root', host:'172.20.15.13', password:'boyaa!@#456'})
+ssh.connect({username:'root', host:'172.20.101.11', password:'boyaa!@#456'})
 .then(function(){
 var cmd = 'node /var/stf/vendor/appium -p 4726 -U FDGNW17213030421 -bp 4727 -tp 4728 --app-pkg com.boyaa.enginedlqp.maindevelop --app-activity com.boyaa.enginedlqp.maindevelop.Game'
 cmd = 'java -version'
+//cmd = 'whereis java'
   ssh.execCmdStream(cmd)
             .then(function (startAppiumStream) {
 startAppiumStream.on('data', function(data){

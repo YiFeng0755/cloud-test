@@ -14,23 +14,28 @@ class NewEnginePackManager(PackManager):
 
     def injectFilesForAutomation(self):
 
+        luaversion = ConfigParse.shareInstance().getLuaVersion()
+        if luaversion.lower() == 'notrepack':
+            return
         self.iterFileMapAndCopyFile()
+
+        if luaversion != '5.0':
         
-        # 2.修改assets/plugin，增加automatedTest
-        decompilePluginPath = os.path.join(self.decompileDir, 'assets', 'plugin')
-        # folder not exists
-        if not os.path.exists(os.path.dirname(decompilePluginPath)):
-            os.makedirs(os.path.dirname(decompilePluginPath))
-        # file not exits
-        if not os.path.exists(decompilePluginPath):
-            with open(decompilePluginPath, 'w') as f:
-                f.write('automatedTest')
-        else:
-            with open(decompilePluginPath) as f:
-                lines = f.readlines()
-                lines[0:0] = ['automatedTest\n']
-            with open(decompilePluginPath, 'w') as f:
-                f.writelines(lines)
+            # 2.修改assets/plugin，增加automatedTest
+            decompilePluginPath = os.path.join(self.decompileDir, 'assets', 'plugin')
+            # folder not exists
+            if not os.path.exists(os.path.dirname(decompilePluginPath)):
+                os.makedirs(os.path.dirname(decompilePluginPath))
+            # file not exits
+            if not os.path.exists(decompilePluginPath):
+                with open(decompilePluginPath, 'w') as f:
+                    f.write('automatedTest')
+            else:
+                with open(decompilePluginPath) as f:
+                    lines = f.readlines()
+                    lines[0:0] = ['automatedTest\n']
+                with open(decompilePluginPath, 'w') as f:
+                    f.writelines(lines)
 
     
         # 4.AndroidManifest.xml增加 provider

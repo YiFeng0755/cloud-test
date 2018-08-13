@@ -13,7 +13,8 @@ import platform
 import os
 dirName = os.path.dirname(os.path.realpath(__file__))
 GOD_TOOL_DIR = os.path.abspath(os.path.join(dirName, os.path.pardir, 'tool'))
-GOD_WORK_DIR = os.path.abspath(os.path.join(dirName, os.path.pardir, 'workspace'))
+#GOD_WORK_DIR = os.path.abspath(os.path.join(dirName, os.path.pardir, 'workspace'))
+GOD_WORK_DIR = os.path.abspath(os.path.join(dirName, os.path.pardir, 'workspace')) if platform.system() == 'Windows' else '/sys/fs/cgroup/repack_workspace'
 SUPPORT_DIR = os.path.abspath(os.path.join(dirName, os.path.pardir, 'automation_support_files'))
 
 GOD_JAVA_DIR 			= GOD_TOOL_DIR + '/jre'

@@ -1,6 +1,7 @@
 #-*-coding:utf8 -*-
 
 import os
+import re
 import time
 
 import cmd_tools
@@ -47,18 +48,28 @@ class PackManager(object):
         log_utils.getLogger().info('taskWorkDir == ' + self.taskWorkDir)
         self.decompileDir = self.taskWorkDir + '/decompile'
         self.tmpApkToolPath = os.path.join(self.taskWorkDir, 'apktooltmp')
+
         if not os.path.exists(self.tmpApkToolPath):
             os.makedirs(self.tmpApkToolPath)
-        
-    
+
     def __del__(self):
         if not self.__debug:
-            my_utils.delete_file_folder(self.taskWorkDir)
-        log_utils.getLogger().info('finished')
+            #my_utils.delete_file_folder(self.taskWorkDir)
+            #my_utils.delete_file_folder(os.path.dirname(os.path.abspath(self.taskWorkDir)))
+            pass
+        
 
     def decompile(self):
         log_utils.getLogger().info('start decompiling...')
-            
+
+        luaversion = ConfigParse.shareInstance().getLuaVersion()
+        if luaversion.lower() == 'notrepack':
+            ret, output = my_utils.execFormatCmd_withOut('%s dump badging %s' % (my_utils.getToolPath('aapt'), ConfigParse.shareInstance().getApkPath()))
+            if not ret and output:
+                r = re.search(r"package: name='(.*)\s+", output)
+                if r:
+                    self._packageName = r.group(1).split("'")[0]
+            return
         taskLogDir = os.path.join(self.taskWorkDir, 'log')
         if not os.path.exists(taskLogDir):
             os.makedirs(taskLogDir)
@@ -70,6 +81,8 @@ class PackManager(object):
             raise PackException(pack_exception.SOURCE_APK_NOT_EXIST, 'source apk file %s does not exist' % self.apkFile)
         
         tmpApkSource = self.taskWorkDir + '/temp.apk'
+        log_utils.getLogger().info('copy source apk file:%s' % self.apkFile)
+        log_utils.getLogger().info('target:%s' % tmpApkSource)
         my_utils.copyFile(self.apkFile,tmpApkSource)
         
         
@@ -85,28 +98,32 @@ class PackManager(object):
         
     
     def pack(self):
-        try:   
+        try:
             log_utils.getLogger().info('generating new r file ... ')
-            #重新生成R文件   
-            
-            ret = cmd_tools.produceNewRFile(
-                self._packageName,
-                self.decompileDir)
-            if ret:
-                raise PackException(pack_exception.PRODUCE_NEW_R_FILE_FAILED, 'produce new r file failed')
-            
-            #重新编译成apk
-            tempRecompileApkDir = self.taskWorkDir + '/tempRecompileApk'
-            tempRecompileApk = '%s/nosig.apk' % (tempRecompileApkDir)
-            tempSignedApkName = '%s/_sig.apk' % (tempRecompileApkDir)
-            
-            log_utils.getLogger().info('recompiling apk ... tempRecompileApk = ' + tempRecompileApk)
-            ret = cmd_tools.recompileApk(self.decompileDir, tempRecompileApk, self.tmpApkToolPath)
-            if ret:
-                raise PackException(pack_exception.RECOMPILE_APK_FAILED, 'recompile apk failed')
-            
+            luaversion = ConfigParse.shareInstance().getLuaVersion()
+            if luaversion.lower() == 'notrepack':
+                tempRecompileApk = ConfigParse.shareInstance().getApkPath()
 
-            
+                tempSignedApkName = '%s/_sig.apk' % os.path.dirname(tempRecompileApk)
+            else:
+                # 重新生成R文件
+
+                ret = cmd_tools.produceNewRFile(
+                    self._packageName,
+                    self.decompileDir)
+                if ret:
+                    raise PackException(pack_exception.PRODUCE_NEW_R_FILE_FAILED, 'produce new r file failed')
+
+                # 重新编译成apk
+                tempRecompileApkDir = self.taskWorkDir + '/tempRecompileApk'
+                tempRecompileApk = '%s/nosig.apk' % (tempRecompileApkDir)
+                tempSignedApkName = '%s/_sig.apk' % (tempRecompileApkDir)
+
+                log_utils.getLogger().info('recompiling apk ... tempRecompileApk = ' + tempRecompileApk)
+                ret = cmd_tools.recompileApk(self.decompileDir, tempRecompileApk, self.tmpApkToolPath)
+                if ret:
+                    raise PackException(pack_exception.RECOMPILE_APK_FAILED, 'recompile apk failed')
+
             # self.outputName是 autotest_xxx.apk
             self.doPackWithoutChannelSymbol(tempRecompileApk, tempSignedApkName, self.outputDir, self.outputName)
             

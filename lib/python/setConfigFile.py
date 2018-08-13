@@ -20,11 +20,13 @@ cf = configparser.ConfigParser()
 cf.read(cfgFilePath, 'utf-8')
 
 for (key, value) in params.items():
-  try:
-    cf.set(secs, key, value)
-  except configparser.NoSectionError:
-    cf.add_section(secs)
-    cf.set(secs, key, value)
+    if value == 'undefined' or value == 'None' or value == 'NaN':
+        continue
+    try:
+        cf.set(secs, key, value)
+    except configparser.NoSectionError:
+        cf.add_section(secs)
+        cf.set(secs, key, value)
 
 fh = open(cfgFilePath, 'w+')
 cf.write(fh)

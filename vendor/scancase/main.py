@@ -46,70 +46,121 @@ def parsePy2Dict(pyfile, pro_base_url, package, module, sub_module, modules, mod
         except:
             return []
         # 把所有类选出来:  ast.ClassDef类型，且继承自TestCase及其子类
-        classes = []
-        for c in p.body:
-            if type(c) == ast.ClassDef:
-                # 先判断是否是已知列表里
-                if list(set(constant.TARGET_BASE_CLASS).intersection(map(lambda name: name.id, c.bases))):
-                    constant.TARGET_BASE_CLASS.append(c.name)
-                    # 判断是否有run_test方法
-                    if filter(lambda f: type(f) == ast.FunctionDef and f.name == 'run_test', c.body):
-                        classes.append(c)
-                # 再去匹配testcase
-                elif filter(lambda name: t.search(name.id), c.bases):
-                    constant.TARGET_BASE_CLASS.append(c.name)
-                    # 判断是否有run_test方法
-                    if filter(lambda f: type(f) == ast.FunctionDef and f.name == 'run_test', c.body):
-                        classes.append(c)
+        flags = ['status', 'priority', 'owner', 'timeout']
         if module_desc == None:
             module_desc = p.body[0].value.s if p.body and type(p.body[0]) == ast.Expr else ''
+        for c in p.body:
+            if type(c) == ast.ClassDef:
+                l = []
+                property = {}
+                hasRuntest = False
+                for a in c.body:
+                    property['doc_string'] = a.value.s.strip().decode('utf-8') if c.body.index(a) == 0 and type(
+                        a) == ast.Expr else property.get('doc_string', '')
+                    if type(a) == ast.Assign:
+                        key = a.targets[0].id
+                        l.append(key)
+                        value = a.value
+                        if type(value) == ast.Str:
+                            value = value.s
+                        elif type(value) == ast.Num:
+                            value = value.n
+                        elif type(value) == ast.Name:
+                            value = value.id
+                        elif type(value) == ast.Attribute:
+                            value = _getAttributeValue(value)
+                        else:
+                            value = None
+                        if value != None:
+                            property[key] = value
+                    elif type(a) == ast.FunctionDef and a.name == 'run_test':
+                        hasRuntest = True
+                if set(flags).issubset(set(l)) and hasRuntest:
+                    property['class_name'] = c.name
+                    property['local_path'] = pyfile
+                    property['base_url'] = pro_base_url
+                    property['project_name'] = util.basename(pro_base_url)
+                    property['package'] = package
+                    property['module'] = module
+                    property['sub_module'] = sub_module
+                    property['modules'] = modules
+                    property['module_desc'] = module_desc
+                    property['case_version'] = version
+                    property['logic_id'] = c.name.split('_')[0]
+                    property['name_for_query'] = '%s.%s.%s' % (package, sub_module, c.name)
+
+                    src = '%s%s' % (c.name, pyfile)
+                    m = hashlib.md5()
+                    m.update(src)
+                    property['id'] = m.hexdigest()
+
+                    filemt = time.localtime(os.stat(pyfile).st_mtime)
+                    property['mtime'] = time.strftime("%Y/%m/%d %H:%M:%S", filemt)
+
+                    property['pycharm_project'] = pycharm_project
+                    property['project_kind'] = project_kind
+                    result.append(property)
+            # if type(c) == ast.ClassDef:
+            #     # 先判断是否是已知列表里
+            #     if list(set(constant.TARGET_BASE_CLASS).intersection(map(lambda name: name.id, c.bases))):
+            #         constant.TARGET_BASE_CLASS.append(c.name)
+            #         # 判断是否有run_test方法
+            #         if filter(lambda f: type(f) == ast.FunctionDef and f.name == 'run_test', c.body):
+            #             classes.append(c)
+            #     # 再去匹配testcase
+            #     elif filter(lambda name: t.search(name.id), c.bases):
+            #         constant.TARGET_BASE_CLASS.append(c.name)
+            #         # 判断是否有run_test方法
+            #         if filter(lambda f: type(f) == ast.FunctionDef and f.name == 'run_test', c.body):
+            #             classes.append(c)
+
         
-        for c in classes:
-            property = {}
-            # 类名 (这个属性不会为空)
-            for i in range(0, len(c.body)):
-                property_object = c.body[i]
-                # doc string只能是紧随类定义下面
-                property['doc_string'] = property_object.value.s.strip().decode('utf-8') if i ==0 and type(property_object) == ast.Expr else property.get('doc_string', '')
-                if type(property_object) == ast.Assign:
-                    key = property_object.targets[0].id
-                    value = property_object.value
-                    if type(value) == ast.Str:
-                        value = value.s
-                    elif type(value) == ast.Num:
-                        value = value.n
-                    elif type(value) == ast.Name:
-                        value = value.id
-                    elif type(value) == ast.Attribute:
-                        value = _getAttributeValue(value)
-                    else:
-                        value = None
-                    if value != None:
-                        property[key] = value
-            property['class_name'] = c.name
-            property['local_path'] = pyfile
-            property['base_url'] = pro_base_url
-            property['project_name'] = util.basename(pro_base_url)
-            property['package'] = package
-            property['module'] = module
-            property['sub_module'] = sub_module
-            property['modules'] = modules
-            property['module_desc'] = module_desc
-            property['case_version'] = version
-            property['logic_id'] = c.name.split('_')[0]
-            property['name_for_query'] = '%s.%s.%s' % (package, sub_module, c.name)
-            
-            src = '%s%s' % (c.name, pyfile)
-            m = hashlib.md5()
-            m.update(src)
-            property['id'] = m.hexdigest()
-            
-            filemt= time.localtime(os.stat(pyfile).st_mtime)
-            property['mtime'] = time.strftime("%Y/%m/%d %H:%M:%S", filemt)
-            
-            property['pycharm_project'] = pycharm_project
-            property['project_kind'] = project_kind
-            result.append(property)
+        # for c in classes:
+        #     property = {}
+        #     # 类名 (这个属性不会为空)
+        #     for i in range(0, len(c.body)):
+        #         property_object = c.body[i]
+        #         # doc string只能是紧随类定义下面
+        #         property['doc_string'] = property_object.value.s.strip().decode('utf-8') if i ==0 and type(property_object) == ast.Expr else property.get('doc_string', '')
+        #         if type(property_object) == ast.Assign:
+        #             key = property_object.targets[0].id
+        #             value = property_object.value
+        #             if type(value) == ast.Str:
+        #                 value = value.s
+        #             elif type(value) == ast.Num:
+        #                 value = value.n
+        #             elif type(value) == ast.Name:
+        #                 value = value.id
+        #             elif type(value) == ast.Attribute:
+        #                 value = _getAttributeValue(value)
+        #             else:
+        #                 value = None
+        #             if value != None:
+        #                 property[key] = value
+        #     property['class_name'] = c.name
+        #     property['local_path'] = pyfile
+        #     property['base_url'] = pro_base_url
+        #     property['project_name'] = util.basename(pro_base_url)
+        #     property['package'] = package
+        #     property['module'] = module
+        #     property['sub_module'] = sub_module
+        #     property['modules'] = modules
+        #     property['module_desc'] = module_desc
+        #     property['case_version'] = version
+        #     property['logic_id'] = c.name.split('_')[0]
+        #     property['name_for_query'] = '%s.%s.%s' % (package, sub_module, c.name)
+        #
+        #     src = '%s%s' % (c.name, pyfile)
+        #     m = hashlib.md5()
+        #     m.update(src)
+        #     property['id'] = m.hexdigest()
+        #
+        #     filemt= time.localtime(os.stat(pyfile).st_mtime)
+        #     property['mtime'] = time.strftime("%Y/%m/%d %H:%M:%S", filemt)
+        #
+        #     property['pycharm_project'] = pycharm_project
+        #     property['project_kind'] = project_kind
+        #     result.append(property)
     return result
 
 def checkout_or_update():
